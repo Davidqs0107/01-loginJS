@@ -26,3 +26,24 @@ export const buildWhereClause = (data) => {
 
     return { whereClause: conditions.join(' AND '), valores };
 };
+
+
+export const buildQueryUpdate = (campos, placeholders, table) => {
+    // Generar consulta dinámica para UPDATE
+    const setQuery = campos.map((campo, index) => `${campo} = ${placeholders[index]}`).join(', ');
+
+    const query = `
+     UPDATE ${table}
+     SET ${setQuery}
+     WHERE id = $${placeholders.length + 1}
+     RETURNING *`;
+    return query;
+}
+
+export const buildQueryCreate = (campos, placeholders, table) => {
+    const query = `
+        INSERT INTO ${table} (${campos.join(', ')})
+        VALUES (${placeholders.join(', ')})
+        RETURNING *`;
+    return query;
+}

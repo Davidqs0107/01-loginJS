@@ -39,7 +39,7 @@ export const registrarEmpresaUsuarioService = async (data) => {
         });
 
     } catch (error) {
-        throw new Error('Usuario o contraseña incorrectos');;
+        throw error;
     }
 }
 
