@@ -1,6 +1,7 @@
 import { response } from "express"
 import { loginService, registrarEmpresaUsuarioService } from "../services/authServices.js";
 import { userError } from "../constants/usuarios.constants.js";
+import { generarJWT } from "../helpers/jwt.js";
 
 export const login = async (req, res = response) => {
     const { email, password } = req.body;
@@ -35,22 +36,37 @@ export const login = async (req, res = response) => {
 }
 
 export const registerEmpresaUsuario = async (req, res) => {
-    const { empresa, usuario } = req.body; // Datos enviados desde el cliente
+    const { empresa, nombre: userNombre, email, password } = req.body; // Datos enviados desde el cliente
     const { nombre } = empresa;
-    const { nombre: userNombre, email, password } = usuario;
     const emailLowerCase = email.toLowerCase();
     try {
-        const result = await registrarEmpresaUsuarioService({ nombre, email: emailLowerCase, password, userNombre });
+        const { empresa, usuario, token } = await registrarEmpresaUsuarioService({ nombre, email: emailLowerCase, password, userNombre });
 
         res.status(201).json({
             ok: true,
             msg: "Empresa y usuario creados con éxito",
-            data: result,
+            usuario: { ...usuario, token },
         });
     } catch (error) {
+        if (error.message === userError.emailInUse) {
+            return res.status(400).json({
+                ok: false,
+                msg: userError.emailInUse,
+            });
+        }
         res.status(500).json({
             ok: false,
             msg: error.message || "Error al registrar empresa y usuario. Contacte al administrador.",
         });
     }
 };
+
+export const renewToken = async (req, res = response) => {
+    const { id, name, empresa_id, rol } = req
+    const token = await generarJWT(id, name, empresa_id, rol);
+    res.json({
+        ok: true,
+        id, name,
+        token
+    });
+}

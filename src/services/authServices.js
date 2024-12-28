@@ -8,7 +8,11 @@ export const registrarEmpresaUsuarioService = async (data) => {
     try {
         const { nombre, email, password, userNombre } = data;
         const emailLowerCase = email.toLowerCase();
-
+        const query = `SELECT id FROM usuarios WHERE email = $1`;
+        const user = await executeSelectOne(query, [emailLowerCase]);
+        if (user.length > 0) {
+            throw new Error(userError.emailInUse);
+        }
         return await executeTransaction(async (client) => {
             // Paso 1: Crear la empresa
             const insertEmpresaQuery = `
@@ -30,7 +34,7 @@ export const registrarEmpresaUsuarioService = async (data) => {
                 emailLowerCase,
                 hashedPassword,
             ]);
-            const token = await generarJWT(usuarioResult.rows[0].id, userNombre, idEmpresa);
+            const token = await generarJWT(usuarioResult.rows[0].id, userNombre, idEmpresa, userRol.admin);
             return {
                 empresa: { id: idEmpresa, nombre },
                 usuario: usuarioResult.rows[0],
@@ -48,7 +52,7 @@ export const loginService = async (data) => {
         const { email, password } = data;
         const emailLowerCase = email.toLowerCase();
         const query = `
-            SELECT id, nombre, email, password, empresa_id
+            SELECT id, nombre, email, password, empresa_id, rol
             FROM usuarios
             WHERE email = $1`;
         const user = await executeSelectOne(query, [emailLowerCase]);
@@ -60,7 +64,7 @@ export const loginService = async (data) => {
         if (!validPassword) {
             throw new Error(userError.incorrectPassword);
         }
-        const token = await generarJWT(usuario.id, usuario.nombre, usuario.empresa_id);
+        const token = await generarJWT(usuario.id, usuario.nombre, usuario.empresa_id, usuario.rol);
         return { ...usuario, token };
 
     } catch (error) {

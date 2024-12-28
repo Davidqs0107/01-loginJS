@@ -12,13 +12,20 @@ export const validarJWT = (req, res = response, next) => {
         });
     }
     try {
-        const { id, name, empresa_id } = jwt.verify(
+        const { id, name, empresa_id, rol } = jwt.verify(
             token,
             process.env.JWT_SECRET
         );
+        if (!rol) {
+            return res.status(401).json({
+                ok: false,
+                message: 'no tiene rol'
+            });
+        }
         req.id = id;
         req.name = name;
         req.empresa_id = empresa_id;
+        req.rol = rol;
     } catch (error) {
         return res.status(401).json({
             ok: false,

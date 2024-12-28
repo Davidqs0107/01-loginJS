@@ -1,6 +1,7 @@
-import { frecuenciaPagoEnum } from "../constants/commons.constans.js";
+import { frecuenciaPagoEnum, tipoPrestamoInteresEnum } from "../constants/commons.constans.js";
 import { notFoundError } from "../constants/notfound.constants.js";
-import { executeSelect, executeSelectOne } from "../helpers/queryS.js";
+import { buildDynamicQuery, buildQueryUpdate } from "../helpers/buildDynamicQuery.js";
+import { executeInsert, executeSelect, executeSelectOne } from "../helpers/queryS.js";
 import { executeTransaction } from "../helpers/transactionSql.js";
 import moment from "moment";
 
@@ -19,14 +20,27 @@ export const getPrestamosServices = async (data) => {
     }
 }
 
-export const getPrestamosByIdService = async (id, empresa_id) => {
+export const getPrestamosByIdService = async (id, empresa_id, mostrarCuotas) => {
     try {
         const prestamo = await executeSelectOne(
-            'SELECT * FROM prestamos WHERE id = $1 AND empresa_id = $2',
+            `SELECT p.*, c.nombre ,c.apellido ,c.telefono ,c.direccion ,c.direccion ,c.email 
+                FROM prestamos p join clientes c 
+                on p.cliente_id = c.id 
+                WHERE p.id = $1 
+                AND p.empresa_id = $2`,
             [id, empresa_id]
         );
         if (prestamo.length === 0) {
             throw new Error(notFoundError.prestamoNotFound);
+        }
+        if (mostrarCuotas) {
+            const { data } = await executeSelect(
+                `SELECT * FROM cuotas 
+                WHERE prestamo_id = $1
+                order by numero_cuota asc`,
+                [id], 1, 1000
+            );
+            prestamo[0].cuotas = data;
         }
 
         return prestamo[0];
@@ -35,7 +49,7 @@ export const getPrestamosByIdService = async (id, empresa_id) => {
     }
 }
 
-export const getPrestamosServicesByUserId = async (data) => {
+export const getPrestamosByUserIdServices = async (data) => {
     const { page, pageSize, id, empresa_id } = data;
     try {
         const prestamos = await executeSelect(
@@ -50,7 +64,7 @@ export const getPrestamosServicesByUserId = async (data) => {
     }
 }
 
-export const getPrestamosServicesByClientId = async (data) => {
+export const getPrestamosByClientIdServices = async (data) => {
     const { page, pageSize, id, empresa_id } = data;
     try {
         const prestamos = await executeSelect(
@@ -66,17 +80,19 @@ export const getPrestamosServicesByClientId = async (data) => {
 }
 
 export const crearPrestamoService = async (data) => {
-    const { cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio } = data;
+    const { cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo } = data;
     try {
         const prestamo = await executeTransaction(async (client) => {
             const query = `
-                INSERT INTO prestamos (cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO prestamos (cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING *`;
-            const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio]);
+            const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo]);
             const idPrestamo = prestamoResult.rows[0].id;
             // Calcular las cuotas
-            const cuotas = calcularCuotas({
+            const calcularCuotasFn =
+                tipo_prestamo === tipoPrestamoInteresEnum.fijo ? calcularCuotasInteresFijo : calcularCuotas;
+            const cuotas = calcularCuotasFn({
                 monto,
                 tasaInteres: tasa_interes,
                 totalCuotas: total_cuotas,
@@ -106,11 +122,62 @@ export const crearPrestamoService = async (data) => {
     }
 }
 
+export const updatePrestamoService = async (id, data) => {
+    const { campos, valores, placeholders } = buildDynamicQuery(data);
+    if (campos.length === 0) {
+        throw new Error('No se enviaron campos para actualizar');
+    }
+    const query = buildQueryUpdate(campos, placeholders, 'prestamos');
+    valores.push(id);
+    try {
+        const prestamo = await executeInsert(query, valores);
+        return prestamo;
+    } catch (error) {
+        throw error;
+    }
 
+}
+
+const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {
+    const cuotas = [];
+    const montoInt = parseFloat(monto);
+    const montoInteres = parseFloat((montoInt * (tasaInteres / 100)).toFixed(2)); // Interés fijo por periodo
+    const frecuenciaUnidad =
+        frecuenciaPago === frecuenciaPagoEnum.quincenal ? "weeks" : // Quincenal como semanas
+            frecuenciaPago === frecuenciaPagoEnum.diario ? "days" :
+                frecuenciaPago === frecuenciaPagoEnum.semanal ? "weeks" :
+                    frecuenciaPago === frecuenciaPagoEnum.anual ? "years" : "months";
+
+    for (let i = 1; i <= totalCuotas; i++) {
+        const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 2 - 1 : i; // Manejo especial para quincenal
+        const fechaPago = moment(fechaInicio)
+            .add(cantidad, frecuenciaUnidad)
+            .format("YYYY-MM-DD");
+
+        if (i < totalCuotas) {
+            // Cuotas intermedias: Solo interés
+            cuotas.push({
+                numeroCuota: i,
+                fechaPago,
+                monto: montoInteres,
+            });
+        } else {
+            // Última cuota: Interés + capital
+            cuotas.push({
+                numeroCuota: i,
+                fechaPago,
+                monto: parseFloat((montoInteres + montoInt)).toFixed(2),
+            });
+        }
+    }
+
+    return cuotas;
+};
 
 const calcularCuotas = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {
     const cuotas = [];
-    const montoTotal = monto * (1 + tasaInteres / 100); // Monto total incluyendo interés
+    const montoInt = parseFloat(monto);
+    const montoTotal = montoInt * (1 + tasaInteres / 100); // Monto total incluyendo interés
     const montoCuota = parseFloat((montoTotal / totalCuotas).toFixed(2)); // Redondear a 2 decimales
 
     let frecuenciaUnidad;

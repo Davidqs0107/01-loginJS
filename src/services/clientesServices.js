@@ -6,7 +6,7 @@ export const getClientesServices = async (data) => {
     const { page, pageSize, empresa_id } = data;
     try {
         const clientes = await executeSelect(
-            'SELECT * FROM clientes WHERE empresa_id = $1',
+            'SELECT * FROM clientes WHERE empresa_id = $1 and estado=true',
             [empresa_id],
             parseInt(page, 10),
             parseInt(pageSize, 10)

@@ -14,7 +14,7 @@ export const getClientes = async (req, res) => {
         });
     } catch (error) {
         console.error('Error en getClientes:', error);
-        res.status(500).json({ msg: 'Error al obtener los clientes.' });
+        res.status(500).json({ ok: false, msg: 'Error al obtener los clientes.' });
     }
 }
 
@@ -68,6 +68,7 @@ export const updateCliente = async (req, res) => {
     // Lógica para actualizar un cliente
     const { id } = req.params;
     const data = req.body;
+    delete data.id; // Eliminar el ID del body
     try {
         const updatedCliente = await updateClientesService(id, data);
         return res.status(200).json({

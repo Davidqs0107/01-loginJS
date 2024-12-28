@@ -5,5 +5,6 @@ export const userRol = {
 
 export const userError = {
     notFound: 'Usuario no encontrado',
-    incorrectPassword: 'Contraseña incorrecta'
+    incorrectPassword: 'Contraseña incorrecta',
+    emailInUse: 'El email ya está en uso'
 }

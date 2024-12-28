@@ -1,5 +1,5 @@
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearPrestamoService, getPrestamosByIdService, getPrestamosServices, getPrestamosServicesByClientId, getPrestamosServicesByUserId } from "../services/prestamosServices.js";
+import { crearPrestamoService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, updatePrestamoService } from "../services/prestamosServices.js";
 
 export const getPrestamos = async (req, res) => {
     const { page = 1, pageSize = 10 } = req.query;
@@ -20,8 +20,9 @@ export const getPrestamos = async (req, res) => {
 export const getPrestamosById = async (req, res) => {
     const { id } = req.params;
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
+    const { mostrarCuotas = false } = req.query;
     try {
-        const result = await getPrestamosByIdService(id, empresa_id);
+        const result = await getPrestamosByIdService(id, empresa_id, mostrarCuotas);
         return res.status(200).json({
             ok: true,
             prestamo: result,
@@ -40,7 +41,7 @@ export const getPrestamosByUserId = async (req, res) => {
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     const { page = 1, pageSize = 10 } = req.query;
     try {
-        const result = await getPrestamosServicesByUserId({ page, pageSize, id: userId, empresa_id });
+        const result = await getPrestamosByUserIdServices({ page, pageSize, id: userId, empresa_id });
         return res.status(200).json({
             ok: true,
             prestamos: result.data,
@@ -57,7 +58,7 @@ export const getPrestamosByClientId = async (req, res) => {
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     const { page = 1, pageSize = 10 } = req.query;
     try {
-        const result = await getPrestamosServicesByClientId({ page, pageSize, id: clientId, empresa_id });
+        const result = await getPrestamosByClientIdServices({ page, pageSize, id: clientId, empresa_id });
         return res.status(200).json({
             ok: true,
             prestamos: result.data,
@@ -72,8 +73,9 @@ export const getPrestamosByClientId = async (req, res) => {
 export const crearPrestamo = async (req, res) => {
     const data = req.body;
     data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware
+    data.usuario_id = req.id; // ID del usuario desde el middleware
     try {
-        const { prestamo, cuotas } = await crearPrestamoService(data);
+        const { prestamo, cuotas } = await crearPrestamoService(data, mostrarCuotas);
         // Lógica para crear un prestamo
         return res.status(201).json({
             ok: true,
@@ -84,5 +86,26 @@ export const crearPrestamo = async (req, res) => {
     } catch (error) {
         console.error('Error en crearPrestamo:', error);
         res.status(500).json({ msg: 'Error al crear el prestamo.' });
+    }
+}
+
+export const updatePrestamo = async (req, res) => {
+    const { id } = req.params;
+    const { documento } = req.body;
+    const data = {};
+    data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware
+    data.usuario_id = req.id; // ID del usuario desde el middleware
+    data.documento = documento; // documento es un campo opcional
+    try {
+        // Lógica para actualizar un prestamo
+        const prestamo = await updatePrestamoService(id, data);
+        return res.status(200).json({
+            ok: true,
+            msg: 'Prestamo actualizado',
+            prestamo
+        });
+    } catch (error) {
+        console.error('Error en updatePrestamo:', error);
+        res.status(500).json({ msg: 'Error al actualizar el prestamo.' });
     }
 }

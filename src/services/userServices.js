@@ -1,3 +1,4 @@
+import { notFoundError } from "../constants/notfound.constants.js";
 import { buildDynamicQuery, buildWhereClause } from "../helpers/buildDynamicQuery.js";
 import { executeInsert, executeQuery, executeSelect, executeSelectOne } from "../helpers/queryS.js";
 import bcrypt from 'bcrypt';
@@ -6,13 +7,13 @@ export const getUsuariosServices = async (data) => {
     const { page = 1, pageSize = 10, empresa_id } = data;
     try {
         const users = await executeSelect(
-            'SELECT * FROM usuarios WHERE empresa_id = $1',
+            'SELECT * FROM usuarios WHERE empresa_id = $1 and estado=true',
             [empresa_id],
             parseInt(page, 10),
             parseInt(pageSize, 10)
         );
         if (users.data.length === 0) {
-            throw new Error('No se encontraron usuarios');
+            throw new Error(notFoundError.noUsersFound);
         }
         return users;
     } catch (error) {
@@ -23,7 +24,7 @@ export const getUsuariosServices = async (data) => {
 
 export const getUsuarioByIdService = async (id) => {
     try {
-        const user = await executeSelectOne('SELECT * From usuarios where id = $1', [id]);
+        const user = await executeSelectOne('SELECT * From usuarios where id = $1 and estado=true', [id]);
         if (user.length === 0) {
             throw new Error('Usuario no encontrado');
         }

@@ -6,6 +6,7 @@ import { pool } from "../db.js";
 import bcrypt from 'bcrypt';
 import { createUsuarioService, getUsuarioByIdService, getUsuariosServices, softDeleteUsuarioService, updateUsuarioService } from "../services/userServices.js";
 import { userRol } from "../constants/usuarios.constants.js";
+import { notFoundError } from "../constants/notfound.constants.js";
 
 export const getUsuarios = async (req, res) => {
     const { page = 1, pageSize = 10 } = req.query; // Parámetros de paginación desde el cliente
@@ -19,6 +20,12 @@ export const getUsuarios = async (req, res) => {
             meta: result.meta, // Metadatos de paginación
         });
     } catch (error) {
+        if (error.message === notFoundError.noUsersFound) {
+            return res.status(404).json({
+                ok: false,
+                msg: error.message,
+            });
+        }
         res.status(500).json({
             ok: false,
             msg: error.message,
@@ -44,6 +51,7 @@ export const getById = async (req, res = response) => {
 }
 
 export const createUsuario = async (req, res = response) => {
+
     const { nombre, apellido, email: emailnot, password, telefono, ci, rol = userRol.cobrador } = req.body;
     const empresa_id = req.empresa_id; // Obtenido del middleware, por ejemplo, del token
     const email = emailnot.toLowerCase();
@@ -75,6 +83,7 @@ export const update = async (req, res = response) => {
     const { id } = req.params;
     const data = req.body;
     try {
+        delete data.id;
         if (data.password) {
             data.password = bcrypt.hashSync(data.password, 10);
         }
@@ -115,6 +124,13 @@ export const deleteUsuario = async (req, res) => {
 export const softDeleteUsuario = async (req, res) => {
     const { id } = req.params;
     const { estado = true } = req.query;
+    const userId = req.id; // Obtenido del middleware, por ejemplo, del token
+    if (userId == id) {
+        return res.status(500).json({
+            ok: false,
+            msg: 'No puede desactivar su propio usuario',
+        });
+    }
     try {
         const updatedUser = await softDeleteUsuarioService({ id }, estado);
 
