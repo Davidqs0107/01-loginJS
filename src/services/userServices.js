@@ -65,6 +65,9 @@ export const createUsuarioService = async (data) => {
 
 export const updateUsuarioService = async (id, data) => {
     try {
+        delete data.updated_at;
+        delete data.created_at;
+        delete data.empresa_id;
         const { campos, valores, placeholders } = buildDynamicQuery(data);
 
         if (campos.length === 0) {

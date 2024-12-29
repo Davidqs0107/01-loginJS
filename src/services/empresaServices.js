@@ -12,6 +12,35 @@ export const getEmpresaByIdService = async (id) => {
     }
 };
 
+export const getSummaryService = async (id) => {
+    try {
+        const querry = `select 
+                (select count(p.id) 
+                 from prestamos p 
+                 where p.empresa_id = $1 
+                   and p.estado_prestamo = 'pendiente') as prestamos_pendientes,
+                (select count(p.id) 
+                 from prestamos p 
+                 where p.empresa_id = $1 
+                   and p.estado_prestamo = 'completado') as prestamos_completados,
+                (select count(c.id) 
+                 from clientes c 
+                 where c.empresa_id = $1 
+                   and c.estado = true) as clientes_activos,
+                (select count(u.id) 
+                 from usuarios u 
+                 where u.empresa_id = $1 
+                   and u.estado = true 
+                   and u.rol = 'cobrador') as cobradores_activos;`;
+        const empresa = await executeSelectOne(querry, [id]);
+        return empresa[0];
+    } catch (error) {
+        console.error('Error en getSummaryService:', error);
+        throw new Error('Error al obtener la empresa.');
+
+    }
+}
+
 export const updateEmpresaService = async (id, data) => {
     try {
         const { campos, valores, placeholders } = buildDynamicQuery(data);

@@ -2,10 +2,10 @@ import { notFoundError } from "../constants/notfound.constants.js";
 import { crearPrestamoService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, updatePrestamoService } from "../services/prestamosServices.js";
 
 export const getPrestamos = async (req, res) => {
-    const { page = 1, pageSize = 10 } = req.query;
+    const { page = 1, pageSize = 10, fecha_inicio = new Date().toISOString().split('T')[0], fecha_fin = new Date().toISOString().split('T')[0] } = req.query;
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     try {
-        const result = await getPrestamosServices({ page, pageSize, empresa_id });
+        const result = await getPrestamosServices({ page, pageSize, empresa_id, fecha_inicio, fecha_fin });
         return res.status(200).json({
             ok: true,
             prestamos: result.data,
@@ -75,7 +75,7 @@ export const crearPrestamo = async (req, res) => {
     data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     data.usuario_id = req.id; // ID del usuario desde el middleware
     try {
-        const { prestamo, cuotas } = await crearPrestamoService(data, mostrarCuotas);
+        const { prestamo, cuotas } = await crearPrestamoService(data);
         // Lógica para crear un prestamo
         return res.status(201).json({
             ok: true,

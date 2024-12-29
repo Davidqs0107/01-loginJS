@@ -6,11 +6,15 @@ import { executeTransaction } from "../helpers/transactionSql.js";
 import moment from "moment";
 
 export const getPrestamosServices = async (data) => {
-    const { page, pageSize, empresa_id } = data;
+    const { page, pageSize, empresa_id, fecha_inicio, fecha_fin } = data;
     try {
         const prestamos = await executeSelect(
-            'SELECT * FROM prestamos WHERE empresa_id = $1',
-            [empresa_id],
+            `SELECT p.*, c.nombre ,c.apellido ,c.telefono ,c.direccion ,c.direccion ,c.email 
+                FROM prestamos p join clientes c 
+                on p.cliente_id = c.id 
+                WHERE p.empresa_id = $1
+                and p.fecha_inicio between $2 and $3`,
+            [empresa_id, fecha_inicio, fecha_fin],
             parseInt(page, 10),
             parseInt(pageSize, 10)
         );
@@ -23,7 +27,7 @@ export const getPrestamosServices = async (data) => {
 export const getPrestamosByIdService = async (id, empresa_id, mostrarCuotas) => {
     try {
         const prestamo = await executeSelectOne(
-            `SELECT p.*, c.nombre ,c.apellido ,c.telefono ,c.direccion ,c.direccion ,c.email 
+            `SELECT p.*, c.nombre ,c.apellido ,c.telefono ,c.direccion ,c.direccion ,c.email, c.ci
                 FROM prestamos p join clientes c 
                 on p.cliente_id = c.id 
                 WHERE p.id = $1 

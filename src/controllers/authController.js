@@ -66,7 +66,10 @@ export const renewToken = async (req, res = response) => {
     const token = await generarJWT(id, name, empresa_id, rol);
     res.json({
         ok: true,
-        id, name,
+        id,
+        name,
+        empresa_id,
+        rol,
         token
     });
 }
