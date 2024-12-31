@@ -101,7 +101,28 @@ export const update = async (req, res = response) => {
         });
     }
 }
+export const updateCobrador = async (req, res = response) => {
+    const { id } = req.params;
+    const data = req.body;
+    try {
+        delete data.id;
+        if (data.password) {
+            data.password = bcrypt.hashSync(data.password, 10);
+        }
+        const updatedUser = await updateUsuarioService(id, data);
+        return res.status(200).json({
+            ok: true,
+            usuario: updatedUser,
+        });
 
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            msg: 'Contacte con el Administrador' + error
+
+        });
+    }
+}
 export const deleteUsuario = async (req, res) => {
     const { id } = req.params;
 

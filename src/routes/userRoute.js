@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createUsuario, deleteUsuario, getById, getUsuarios, softDeleteUsuario, update } from "../controllers/userController.js";
+import { createUsuario, deleteUsuario, getById, getUsuarios, softDeleteUsuario, update, updateCobrador } from "../controllers/userController.js";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarCampos } from "../middlewares/validar-campos.js";
 import { check } from "express-validator";
@@ -20,6 +20,9 @@ route.post('/', [
 route.put('/:id', [
     validarRol
 ], update);
+route.put('/cobrador/:id', [
+    validarRol
+], updateCobrador);
 route.delete('/:id', [validarRol], deleteUsuario);
 route.delete('/soft/:id', [validarRol], softDeleteUsuario);
 export default route;
