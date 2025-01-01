@@ -1,8 +1,10 @@
 import { frecuenciaPagoEnum, tipoPrestamoInteresEnum } from "../constants/commons.constans.js";
 import { notFoundError } from "../constants/notfound.constants.js";
 import { buildDynamicQuery, buildQueryUpdate } from "../helpers/buildDynamicQuery.js";
-import { executeInsert, executeSelect, executeSelectOne } from "../helpers/queryS.js";
+import { executeInsert, executeQuery, executeSelect, executeSelectOne } from "../helpers/queryS.js";
+import { sanitizeFileName } from "../helpers/sanityFileName.js";
 import { executeTransaction } from "../helpers/transactionSql.js";
+import fs from 'fs/promises';
 import moment from "moment";
 
 export const getPrestamosServices = async (data) => {
@@ -13,7 +15,8 @@ export const getPrestamosServices = async (data) => {
                 FROM prestamos p join clientes c 
                 on p.cliente_id = c.id 
                 WHERE p.empresa_id = $1
-                and p.fecha_inicio between $2 and $3`,
+                and p.fecha_inicio between $2 and $3
+                and p.estado = true`,
             [empresa_id, fecha_inicio, fecha_fin],
             parseInt(page, 10),
             parseInt(pageSize, 10)
@@ -84,14 +87,14 @@ export const getPrestamosByClientIdServices = async (data) => {
 }
 
 export const crearPrestamoService = async (data) => {
-    const { cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo } = data;
+    const { cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo, documento } = data;
     try {
         const prestamo = await executeTransaction(async (client) => {
             const query = `
-                INSERT INTO prestamos (cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                INSERT INTO prestamos (cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo,documento)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10)
                 RETURNING *`;
-            const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo]);
+            const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo, documento]);
             const idPrestamo = prestamoResult.rows[0].id;
             // Calcular las cuotas
             const calcularCuotasFn =
@@ -140,6 +143,82 @@ export const updatePrestamoService = async (id, data) => {
         throw error;
     }
 
+}
+
+export const uploadFileService = async (id, archivo) => {
+    const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!tiposPermitidos.includes(archivo.mimetype)) {
+        throw new Error('Tipo de archivo no permitido');
+    }
+    try {
+        const sanitizedFileName = sanitizeFileName(archivo.name);
+        const nombreArchivo = `${Date.now()}_${sanitizedFileName}`;
+        const rutaArchivo = `uploads/${id}/${nombreArchivo}`;
+
+
+        await archivo.mv(rutaArchivo, async (err) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ error: 'Error al guardar el archivo' });
+            }
+
+            // Guardar información en la base de datos
+
+        });
+        const query = `
+        INSERT INTO prestamo_archivos (prestamo_id, nombre_archivo, ruta_archivo)
+        VALUES ($1, $2, $3) RETURNING *;
+    `;
+        const values = [id, nombreArchivo, rutaArchivo];
+
+        return await executeInsert(query, values);
+    } catch (error) {
+        throw error;
+    }
+}
+
+export const getUploadFileService = async (id) => {
+    try {
+        const query = `
+        SELECT * FROM prestamo_archivos WHERE prestamo_id = $1;
+    `;
+        return await executeSelectOne(query, [id]);
+    } catch (error) {
+        throw error;
+    }
+}
+
+export const deleteFileService = async (prestamoId, archivoId) => {
+    try {
+        const querySelect = `
+            SELECT ruta_archivo
+            FROM prestamo_archivos
+            WHERE id = $1 AND prestamo_id = $2;
+        `;
+        const valuesSelect = [archivoId, prestamoId];
+        const archivo = await executeQuery(querySelect, valuesSelect);
+
+        if (archivo.length === 0) {
+            return null; // Archivo no encontrado
+        }
+
+        const rutaArchivo = archivo[0].ruta_archivo;
+
+        // Eliminar el archivo del sistema de archivos
+        await fs.unlink(rutaArchivo);
+
+        // Eliminar el registro de la base de datos
+        const queryDelete = `
+            DELETE FROM prestamo_archivos
+            WHERE id = $1 AND prestamo_id = $2;
+        `;
+        const valuesDelete = [archivoId, prestamoId];
+        await executeQuery(queryDelete, valuesDelete);
+
+        return true;
+    } catch (error) {
+        throw error;
+    }
 }
 
 const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {

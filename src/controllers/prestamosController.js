@@ -1,5 +1,6 @@
+import { response } from "express";
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearPrestamoService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, updatePrestamoService } from "../services/prestamosServices.js";
+import { crearPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
 
 export const getPrestamos = async (req, res) => {
     const { page = 1, pageSize = 10, fecha_inicio = new Date().toISOString().split('T')[0], fecha_fin = new Date().toISOString().split('T')[0] } = req.query;
@@ -109,3 +110,76 @@ export const updatePrestamo = async (req, res) => {
         res.status(500).json({ msg: 'Error al actualizar el prestamo.' });
     }
 }
+
+export const uploadFile = async (req, res = response) => {
+    // Lógica para subir un archivo
+    const { id } = req.params;
+
+    // Validar si hay archivos en la solicitud
+    if (!req.files || !req.files.archivo) {
+        return res.status(400).json({ ok: false, error: 'No se envió ningún archivo' });
+    }
+
+    const archivo = req.files.archivo;
+
+    try {
+        // Lógica para subir un archivo
+        const result = await uploadFileService(id, archivo);
+        return res.status(200).json({
+            ok: true,
+            msg: 'Archivo subido',
+            archivo: result
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+}
+
+export const getUploadFile = async (req, res) => {
+    // Lógica para obtener un archivo
+    const { id } = req.params;
+    try {
+        // Lógica para obtener un archivo
+        const archivo = await getUploadFileService(id);
+        return res.status(200).json({
+            ok: true,
+            msg: 'Archivo obtenido',
+            archivo: archivo
+        });
+    } catch (error) {
+        console.error('Error en getUploadFile:', error);
+        res.status(500).json({ msg: 'Error al obtener el archivo.' });
+    }
+}
+
+
+export const deleteFile = async (req, res = response) => {
+    const { id, archivoId } = req.params;
+
+    try {
+        // Llamar al servicio para eliminar el archivo
+        const result = await deleteFileService(id, archivoId);
+
+        if (!result) {
+            return res.status(404).json({
+                ok: false,
+                msg: 'Archivo no encontrado',
+            });
+        }
+
+        return res.status(200).json({
+            ok: true,
+            msg: 'Archivo eliminado correctamente',
+        });
+    } catch (error) {
+        console.error('Error al eliminar el archivo:', error.message);
+
+        return res.status(500).json({
+            ok: false,
+            error: 'Error interno del servidor',
+            details: error.message,
+        });
+    }
+};

@@ -49,7 +49,7 @@ export const getPagosByIdServices = async (data) => {
 }
 
 export const crearPagoService = async (data) => {
-    const { cuota_id, usuario_id, monto, fecha_pago, empresa_id } = data;
+    const { cuota_id, usuario_id, monto, fecha_pago, tipo_pago } = data;
 
     try {
         const res = await executeTransaction(async (client) => {
@@ -78,10 +78,10 @@ export const crearPagoService = async (data) => {
 
             // Insertar el pago en la tabla pagos
             const insertarPagoQuery = `
-                INSERT INTO pagos (cuota_id, usuario_id, monto, fecha_pago)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO pagos (cuota_id, usuario_id, monto,tipo_pago, fecha_pago)
+                VALUES ($1, $2, $3, $4,$5)
                 RETURNING id`;
-            const pagoResult = await client.query(insertarPagoQuery, [cuota_id, usuario_id, montoAplicado, fecha_pago]);
+            const pagoResult = await client.query(insertarPagoQuery, [cuota_id, usuario_id, montoAplicado, tipo_pago, fecha_pago]);
 
             // Actualizar la cuota con el monto pagado y el nuevo estado
             const actualizarCuotaQuery = `

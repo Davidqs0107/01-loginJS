@@ -21,7 +21,7 @@ route.put('/:id', [
     validarRol
 ], update);
 route.put('/cobrador/:id', [
-    validarRol
+
 ], updateCobrador);
 route.delete('/:id', [validarRol], deleteUsuario);
 route.delete('/soft/:id', [validarRol], softDeleteUsuario);

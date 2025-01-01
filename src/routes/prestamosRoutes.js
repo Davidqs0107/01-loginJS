@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarCampos } from "../middlewares/validar-campos.js";
 import { check } from "express-validator";
-import { crearPrestamo, getPrestamos, getPrestamosByClientId, getPrestamosById, getPrestamosByUserId, updatePrestamo } from "../controllers/prestamosController.js";
+import { crearPrestamo, deleteFile, getPrestamos, getPrestamosByClientId, getPrestamosById, getPrestamosByUserId, getUploadFile, updatePrestamo, uploadFile } from "../controllers/prestamosController.js";
 const route = Router();
 route.use(validarJWT);
 
@@ -24,6 +24,13 @@ route.put('/:id', [
     check('documento', 'El campo documento es obligatorio').not().isEmpty(),
     validarCampos
 ], updatePrestamo);
+
+route.post('/:id/archivos', [
+
+], uploadFile);
+
+route.get('/:id/archivos', getUploadFile);
+route.delete('/:id/archivos/:archivoId', deleteFile);
 // // route.delete('/:id', deleteUsuario);
 // route.delete('/soft/:id', softDeleteCliente);
 export default route;

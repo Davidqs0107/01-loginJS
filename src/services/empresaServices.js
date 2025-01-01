@@ -31,7 +31,12 @@ export const getSummaryService = async (id) => {
                  from usuarios u 
                  where u.empresa_id = $1 
                    and u.estado = true 
-                   and u.rol = 'cobrador') as cobradores_activos;`;
+                   and u.rol = 'cobrador') as cobradores_activos,
+                (select sum(p.monto)
+                from pagos p join usuarios u 
+                on p.usuario_id = u.id 
+                where u.empresa_id = $1) as total_recaudado
+                   ;`;
         const empresa = await executeSelectOne(querry, [id]);
         return empresa[0];
     } catch (error) {
