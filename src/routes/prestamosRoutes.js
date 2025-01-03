@@ -3,6 +3,9 @@ import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarCampos } from "../middlewares/validar-campos.js";
 import { check } from "express-validator";
 import { crearPrestamo, deleteFile, getPrestamos, getPrestamosByClientId, getPrestamosById, getPrestamosByUserId, getUploadFile, updatePrestamo, uploadFile } from "../controllers/prestamosController.js";
+import { validarRol } from "../middlewares/validar-rol.js";
+import { userRol } from "../constants/usuarios.constants.js";
+const { superAdmin, admin } = userRol;
 const route = Router();
 route.use(validarJWT);
 
@@ -18,15 +21,17 @@ route.post('/', [
     check('frecuencia_pago', 'El campo frecuencia_pago es obligatorio').not().isEmpty(),
     check('total_cuotas', 'El campo total_cuotas es obligatorio').not().isEmpty(),
     check('fecha_inicio', 'El campo fecha_inicio es obligatorio').not().isEmpty(),
-    validarCampos
+    validarCampos,
+    validarRol(superAdmin, admin)
 ], crearPrestamo);
 route.put('/:id', [
     check('documento', 'El campo documento es obligatorio').not().isEmpty(),
-    validarCampos
+    validarCampos,
+    validarRol(superAdmin, admin)
 ], updatePrestamo);
 
 route.post('/:id/archivos', [
-
+    validarRol(superAdmin, admin)
 ], uploadFile);
 
 route.get('/:id/archivos', getUploadFile);

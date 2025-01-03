@@ -4,6 +4,8 @@ import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarCampos } from "../middlewares/validar-campos.js";
 import { check } from "express-validator";
 import { validarRol } from "../middlewares/validar-rol.js";
+import { userRol } from "../constants/usuarios.constants.js";
+const { superAdmin, admin, cobrador } = userRol;
 const route = Router();
 route.use(validarJWT);
 
@@ -15,14 +17,14 @@ route.post('/', [
     check('email', 'El email es obligatorio').isEmail(),
     check('password', 'El password es obligatorio').not().isEmpty(),
     validarCampos,
-    validarRol
+    validarRol(superAdmin, admin)
 ], createUsuario);
 route.put('/:id', [
-    validarRol
+    validarRol(superAdmin, admin)
 ], update);
 route.put('/cobrador/:id', [
 
 ], updateCobrador);
-route.delete('/:id', [validarRol], deleteUsuario);
-route.delete('/soft/:id', [validarRol], softDeleteUsuario);
+route.delete('/:id', [validarRol(superAdmin, admin)], deleteUsuario);
+route.delete('/soft/:id', [validarRol(superAdmin, admin)], softDeleteUsuario);
 export default route;

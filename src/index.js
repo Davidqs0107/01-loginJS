@@ -8,6 +8,7 @@ import clientesRouter from './routes/clientesRoutes.js';
 import prestamosRouter from './routes/prestamosRoutes.js';
 import cuotasRouter from './routes/cuotasRoutes.js';
 import pagosRouter from './routes/pagosRoutes.js';
+import adminRouter from './routes/adminRoutes.js';
 import fileUpload from 'express-fileupload';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -29,6 +30,7 @@ app.use(fileUpload({
 app.use('/api/uploads', express.static('uploads'));
 //rutas
 app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/user', userRouter);
 app.use('/api/empresa', empresaRouter);
 app.use('/api/clientes', clientesRouter);

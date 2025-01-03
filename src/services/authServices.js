@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { executeTransaction } from "../helpers/transactionSql.js";
 import { generarJWT } from "../helpers/jwt.js";
 import { executeSelectOne } from "../helpers/queryS.js";
+import { estadoEmpresaPlanes } from "../constants/empresa_planes.constanst.js";
 
 export const registrarEmpresaUsuarioService = async (data) => {
     try {
@@ -34,7 +35,25 @@ export const registrarEmpresaUsuarioService = async (data) => {
                 emailLowerCase,
                 hashedPassword,
             ]);
-            const token = await generarJWT(usuarioResult.rows[0].id, userNombre, idEmpresa, userRol.admin);
+
+            // Paso 3: Registrar el plan "prueba"
+            const fechaInicio = new Date();
+            const fechaFin = new Date(fechaInicio);
+            fechaFin.setDate(fechaFin.getDate() + 7); // Sumar 7 días
+
+            const insertPlanQuery = `
+                INSERT INTO empresa_planes (empresa_id, plan_id, fecha_inicio, fecha_fin, estado)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING *`;
+            const planPruebaId = 1; // Asume que el plan "prueba" tiene ID 1
+            await client.query(insertPlanQuery, [
+                idEmpresa,
+                planPruebaId,
+                fechaInicio,
+                fechaFin,
+                estadoEmpresaPlanes.activo,
+            ]);
+            const token = await generarJWT(usuarioResult.rows[0].id, userNombre, idEmpresa, userRol.admin, fechaFin);
             return {
                 empresa: { id: idEmpresa, nombre },
                 usuario: usuarioResult.rows[0],
@@ -52,19 +71,26 @@ export const loginService = async (data) => {
         const { email, password } = data;
         const emailLowerCase = email.toLowerCase();
         const query = `
-            SELECT id, nombre, email, password, empresa_id, rol
-            FROM usuarios
+            SELECT u.id, u.nombre, u.email, u.password, u.empresa_id, u.rol,ep.fecha_fin ,ep.estado as "empresaEstado",u.estado 
+            FROM usuarios u join empresa_planes ep 
+            on u.empresa_id = ep.empresa_id 
             WHERE email = $1`;
         const user = await executeSelectOne(query, [emailLowerCase]);
         if (user.length === 0) {
             throw new Error(userError.notFound);
+        }
+        if (user[0].empresaEstado === estadoEmpresaPlanes.inactivo) {
+            throw new Error(userError.inactiveCompany);
         }
         const [usuario] = user;
         const validPassword = bcrypt.compareSync(password, usuario.password);
         if (!validPassword) {
             throw new Error(userError.incorrectPassword);
         }
-        const token = await generarJWT(usuario.id, usuario.nombre, usuario.empresa_id, usuario.rol);
+        if (usuario.estado !== true) {
+            throw new Error(userError.inactiveUser);
+        }
+        const token = await generarJWT(usuario.id, usuario.nombre, usuario.empresa_id, usuario.rol, usuario.fecha_fin);
         return { ...usuario, token };
 
     } catch (error) {

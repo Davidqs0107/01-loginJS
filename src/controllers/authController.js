@@ -18,7 +18,7 @@ export const login = async (req, res = response) => {
             usuario: user
         });
     } catch (error) {
-        if (error.message === userError.notFound || error.message === userError.incorrectPassword) {
+        if (error.message === userError.notFound || error.message === userError.incorrectPassword || error.message === userError.inactiveUser || error.message === userError.inactiveCompany) {
             return res.status(400).json({
                 ok: false,
                 msg: error.message,
@@ -51,7 +51,7 @@ export const registerEmpresaUsuario = async (req, res) => {
         if (error.message === userError.emailInUse) {
             return res.status(400).json({
                 ok: false,
-                msg: userError.emailInUse,
+                msg: error.message,
             });
         }
         res.status(500).json({
@@ -62,8 +62,8 @@ export const registerEmpresaUsuario = async (req, res) => {
 };
 
 export const renewToken = async (req, res = response) => {
-    const { id, name, empresa_id, rol } = req
-    const token = await generarJWT(id, name, empresa_id, rol);
+    const { id, name, empresa_id, rol, fecha_fin } = req
+    const token = await generarJWT(id, name, empresa_id, rol, fecha_fin);
     res.json({
         ok: true,
         id,
