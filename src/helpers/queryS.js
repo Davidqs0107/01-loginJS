@@ -17,7 +17,6 @@ export const executeSelect = async (query, params = [], page = 1, pageSize = 10)
 
         // Añadimos LIMIT y OFFSET a la consulta
         const paginatedQuery = `${query} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-
         // Ejecutamos la consulta con los parámetros
         const { rows } = await client.query(paginatedQuery, [...params, pageSize, offset]);
 
