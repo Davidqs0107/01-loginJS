@@ -21,7 +21,20 @@ export const getUsuariosServices = async (data) => {
     }
 
 }
+export const getUsuariosCobradoresServices = async (data) => {
+    const { empresa_id } = data;
+    try {
+        const users = await executeSelectOne(
+            `SELECT count(*) FROM usuarios WHERE empresa_id = $1 and estado=true
+    	        and rol = 'cobrador'`,
+            [empresa_id],
+        );
+        return users[0] || 0;
+    } catch (error) {
+        throw error;
+    }
 
+}
 export const getUsuarioByIdService = async (id) => {
     try {
         const user = await executeSelectOne('SELECT * From usuarios where id = $1 and estado=true', [id]);

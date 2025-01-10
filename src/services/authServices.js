@@ -53,10 +53,10 @@ export const registrarEmpresaUsuarioService = async (data) => {
                 fechaFin,
                 estadoEmpresaPlanes.activo,
             ]);
-            const token = await generarJWT(usuarioResult.rows[0].id, userNombre, idEmpresa, userRol.admin, fechaFin);
+            const token = await generarJWT(usuarioResult.rows[0].id, userNombre, idEmpresa, userRol.admin, fechaFin, planPruebaId);
             return {
                 empresa: { id: idEmpresa, nombre },
-                usuario: usuarioResult.rows[0],
+                usuario: { ...usuarioResult.rows[0], planPruebaId },
                 token
             };
         });
@@ -71,7 +71,8 @@ export const loginService = async (data) => {
         const { email, password } = data;
         const emailLowerCase = email.toLowerCase();
         const query = `
-            SELECT u.id, u.nombre, u.email, u.password, u.empresa_id, u.rol,ep.fecha_fin ,ep.estado as "empresaEstado",u.estado 
+            SELECT u.id, u.nombre, u.email, u.password, u.empresa_id, u.rol,ep.fecha_fin ,ep.estado as "empresaEstado",u.estado
+            , ep,plan_id
             FROM usuarios u join empresa_planes ep 
             on u.empresa_id = ep.empresa_id 
             WHERE email = $1`;
@@ -90,7 +91,7 @@ export const loginService = async (data) => {
         if (usuario.estado !== true) {
             throw new Error(userError.inactiveUser);
         }
-        const token = await generarJWT(usuario.id, usuario.nombre, usuario.empresa_id, usuario.rol, usuario.fecha_fin);
+        const token = await generarJWT(usuario.id, usuario.nombre, usuario.empresa_id, usuario.rol, usuario.fecha_fin, usuario.plan_id);
         return { ...usuario, token };
 
     } catch (error) {

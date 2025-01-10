@@ -31,6 +31,7 @@ export const getPrestamosByIdService = async (id, empresa_id, mostrarCuotas) => 
     try {
         const prestamo = await executeSelectOne(
             `SELECT p.*, c.nombre ,c.apellido ,c.telefono ,c.direccion ,c.direccion ,c.email, c.ci
+                ,c.latitud,c.longitud
                 FROM prestamos p join clientes c 
                 on p.cliente_id = c.id 
                 WHERE p.id = $1 

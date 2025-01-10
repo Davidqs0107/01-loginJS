@@ -4,7 +4,7 @@
 import { response } from "express"
 import { pool } from "../db.js";
 import bcrypt from 'bcrypt';
-import { createUsuarioService, getUsuarioByIdService, getUsuariosServices, softDeleteUsuarioService, updateUsuarioService } from "../services/userServices.js";
+import { createUsuarioService, getUsuarioByIdService, getUsuariosCobradoresServices, getUsuariosServices, softDeleteUsuarioService, updateUsuarioService } from "../services/userServices.js";
 import { userRol } from "../constants/usuarios.constants.js";
 import { notFoundError } from "../constants/notfound.constants.js";
 
@@ -54,8 +54,16 @@ export const createUsuario = async (req, res = response) => {
 
     const { nombre, apellido, email: emailnot, password, telefono, ci, rol = userRol.cobrador } = req.body;
     const empresa_id = req.empresa_id; // Obtenido del middleware, por ejemplo, del token
+    const plan_id = req.plan_id || 1;
     const email = emailnot.toLowerCase();
     try {
+        if (plan_id < 3) {
+            const userExist = await getUsuariosCobradoresServices({ empresa_id });
+            if (userExist.count > 0) return res.status(403).json({
+                ok: false,
+                msg: 'No puede crear mas usuarios con este plan'
+            })
+        }
         const newUser = await createUsuarioService({
             nombre,
             apellido,

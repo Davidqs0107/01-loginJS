@@ -62,14 +62,15 @@ export const registerEmpresaUsuario = async (req, res) => {
 };
 
 export const renewToken = async (req, res = response) => {
-    const { id, name, empresa_id, rol, fecha_fin } = req
-    const token = await generarJWT(id, name, empresa_id, rol, fecha_fin);
+    const { id, name, empresa_id, rol, fecha_fin, plan_id } = req
+    const token = await generarJWT(id, name, empresa_id, rol, fecha_fin, plan_id);
     res.json({
         ok: true,
         id,
         name,
         empresa_id,
         rol,
+        plan_id,
         token
     });
 }

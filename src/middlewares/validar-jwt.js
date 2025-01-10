@@ -17,7 +17,7 @@ export const validarJWT = async (req, res = response, next) => {
         });
     }
     try {
-        const { id, name, empresa_id, rol, fecha_fin } = jwt.verify(
+        const { id, name, empresa_id, rol, fecha_fin, plan_id } = jwt.verify(
             token,
             process.env.JWT_SECRET
         );
@@ -59,6 +59,7 @@ export const validarJWT = async (req, res = response, next) => {
         req.empresa_id = empresa_id;
         req.rol = rol;
         req.fecha_fin = fecha_fin;
+        req.plan_id = plan_id;
     } catch (error) {
         // cache.del(`plan-${empresa_id}`);
         return res.status(401).json({
