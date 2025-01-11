@@ -1,3 +1,4 @@
+import { formatDateWithDateFns } from "../helpers/functions.js";
 import { executeQuery, executeSelect } from "../helpers/queryS.js";
 
 export const getEmpresasService = async (data) => {
@@ -33,7 +34,7 @@ export const updateEmpresaPlanService = async (data) => {
     try {
         const fechaInicio = new Date();
         const fechaFin = new Date();
-        fechaFin.setDate(fechaInicio.getDate() + dias);
+        fechaFin.setDate(fechaInicio.getDate() + parseInt(dias));
         const empresa = await executeQuery(
             `update empresa_planes set fecha_inicio = $1, 
             fecha_fin = $2, plan_id = $3,
@@ -42,7 +43,7 @@ export const updateEmpresaPlanService = async (data) => {
             where empresa_id = $5  returning *`,
             [fechaInicio, fechaFin, plan_id, estado, id]
         );
-        return empresa;
+        return { ...empresa[0], fecha_inicio: formatDateWithDateFns(fechaInicio), fecha_fin: formatDateWithDateFns(fechaFin) };
     } catch (error) {
         throw error;
     }
