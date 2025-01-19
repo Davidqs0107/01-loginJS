@@ -14,11 +14,11 @@ export const frecuenciaPagoEnum = {
     anual: "anual",
 }
 
-export const tipoPrestamoEnum = {
-    personal: "personal",
-    hipotecario: "hipotecario",
-    vehicular: "vehicular",
-    empresarial: "empresarial",
+export const estadoPrestamo = {
+    pendiente: "pendiente",
+    activo: "activo",
+    completado: "completado",
+    incumplido: "incumplido",
 }
 export const tipoPrestamoInteresEnum = {
     cuota: "cuota",

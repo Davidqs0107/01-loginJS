@@ -18,7 +18,7 @@ export const getSummaryService = async (id) => {
                 (select count(p.id) 
                  from prestamos p 
                  where p.empresa_id = $1 
-                   and p.estado_prestamo = 'pendiente') as prestamos_pendientes,
+                   and (p.estado_prestamo = 'pendiente' or p.estado_prestamo = 'activo')) as prestamos_pendientes,
                 (select count(p.id) 
                  from prestamos p 
                  where p.empresa_id = $1 

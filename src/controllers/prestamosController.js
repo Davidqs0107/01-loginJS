@@ -1,6 +1,7 @@
 import { response } from "express";
 import { notFoundError } from "../constants/notfound.constants.js";
 import { crearPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
+import { estadoPrestamo } from "../constants/commons.constans.js";
 
 export const getPrestamos = async (req, res) => {
     const { page = 1, pageSize = 10, fecha_inicio = new Date().toISOString().split('T')[0], fecha_fin = new Date().toISOString().split('T')[0] } = req.query;
@@ -92,11 +93,12 @@ export const crearPrestamo = async (req, res) => {
 
 export const updatePrestamo = async (req, res) => {
     const { id } = req.params;
-    const { documento } = req.body;
+    const { documento, estado_prestamo = estadoPrestamo.pendiente } = req.body;
     const data = {};
     data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     data.usuario_id = req.id; // ID del usuario desde el middleware
     data.documento = documento; // documento es un campo opcional
+    data.estado_prestamo = estado_prestamo;
     try {
         // Lógica para actualizar un prestamo
         const prestamo = await updatePrestamoService(id, data);
