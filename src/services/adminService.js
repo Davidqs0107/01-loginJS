@@ -48,3 +48,17 @@ export const updateEmpresaPlanService = async (data) => {
         throw error;
     }
 }
+
+export const getUsuariosByEmpresaService = async (empresaId) => {
+    try {
+        const usuarios = await executeSelect(
+            `select u.id, u.nombre, u.email, u.rol, u.estado, u.created_at
+            from usuarios u
+            where u.empresa_id = $1`,
+            [empresaId]
+        );
+        return usuarios;
+    } catch (error) {
+        throw error;
+    }
+}

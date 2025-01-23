@@ -99,8 +99,10 @@ export const updateEmpresaService = async (id, data) => {
 
 export const disabledPlanEmpresaService = async (empresaId, estado = 'inactivo') => {
     try {
-        const query = `UPDATE empresa_planes SET estado = ${estado} WHERE empresa_id = $1`;
-        await executeInsert(query, [empresaId]);
+        const query = `UPDATE empresa_planes SET estado = $1,
+        updated_at = now()
+        WHERE empresa_id = $2`;
+        await executeInsert(query, [estado, empresaId]);
     } catch (error) {
         console.error('Error en disabledPlanEmpresaService:', error);
         throw error;
