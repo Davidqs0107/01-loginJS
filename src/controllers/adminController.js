@@ -1,5 +1,5 @@
 import { estadoEmpresaPlanes } from "../constants/empresa_planes.constanst.js";
-import { getEmpresasService, getPlanesService, getUsuariosByEmpresaService, updateEmpresaPlanService } from "../services/adminService.js";
+import { getEmpresaByNameService, getEmpresasService, getPlanesService, getUsuariosByEmpresaService, updateEmpresaPlanService } from "../services/adminService.js";
 import { formatDateWithDateFns } from "../helpers/functions.js"
 export const getEmpresas = async (req, res = response) => {
     const date = formatDateWithDateFns(new Date());
@@ -56,6 +56,23 @@ export const getUsuariosByEmpresa = async (req, res = response) => {
         res.status(200).json({
             ok: true,
             usuarios,
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            msg: error,
+        });
+    }
+}
+
+export const getEmpresaByName = async (req, res = response) => {
+    const { find } = req.params;
+    try {
+        const result = await getEmpresaByNameService(find);
+        res.status(200).json({
+            ok: true,
+            empresas: result.data,
+            meta: result.meta
         });
     } catch (error) {
         res.status(500).json({

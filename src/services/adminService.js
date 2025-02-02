@@ -62,3 +62,23 @@ export const getUsuariosByEmpresaService = async (empresaId) => {
         throw error;
     }
 }
+
+export const getEmpresaByNameService = async (nombre) => {
+    try {
+        const page = 1;
+        const pageSize = 100;
+        const empresa = await executeSelect(
+            `select e.id ,e.nombre ,e.estado , ep.id as "empresa_planes_id",ep.fecha_inicio ,ep.fecha_fin ,ep.estado as "estado_empresa_plan" ,
+                    ep.plan_id ,p.nombre as "nombre_plan" ,p.precio ,p.duracion_dias ,e.created_at
+                    from empresas e join empresa_planes ep 
+                    on e.id = ep.empresa_id 
+                    join planes p
+                    on ep.plan_id = p.id
+                    WHERE e.nombre ILIKE '%' || $1 || '%'`,
+            [nombre], page, pageSize
+        );
+        return empresa;
+    } catch (error) {
+        throw error;
+    }
+}
