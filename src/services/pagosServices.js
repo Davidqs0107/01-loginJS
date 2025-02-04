@@ -100,17 +100,20 @@ export const crearPagoService = async (data) => {
                 pagoId: pagoResult.rows[0].id,
                 cuotaActualizada: cuotaResult.rows[0],
                 mensajeExcedente: monto > restante ? `El monto del pago excedió el requerido. Se aplicaron ${montoAplicado} y el excedente es ${monto - restante}.` : null,
+                montoAplicado: montoAplicado,
             };
         });
 
         return {
             pagoId: res.pagoId,
             cuotaActualizada: res.cuotaActualizada,
-            mensajeExcedente: res.mensajeExcedente
+            mensajeExcedente: res.mensajeExcedente,
+            montoAplicado: res.montoAplicado
         };
     } catch (error) {
         throw error;
     }
+
 };
 
 export const eliminarPagoService = async (pagoId) => {

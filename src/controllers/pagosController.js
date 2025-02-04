@@ -54,17 +54,19 @@ export const crearPago = async (req, res) => {
     data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     data.usuario_id = req.id; // ID del usuario desde el middleware
     try {
-        const { pagoId, mensajeExcedente, cuotaActualizada } = await crearPagoService(data);
+        const { pagoId, mensajeExcedente, cuotaActualizada, montoAplicado } = await crearPagoService(data);
         res.status(201).json({
             ok: true,
             pagoId,
             msg: mensajeExcedente,
             cuotaActualizada: cuotaActualizada,
+            montoAplicado: montoAplicado,
         });
     } catch ({ message }) {
         console.error('Error en crearPago:', message);
         return res.status(500).json({ ok: false, msg: message });
     }
+
 
 }
 

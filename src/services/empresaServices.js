@@ -1,4 +1,5 @@
 import { buildDynamicQuery, buildQueryUpdate } from "../helpers/buildDynamicQuery.js";
+import { formatDateWithDateFns } from "../helpers/functions.js";
 import { executeInsert, executeSelectOne } from "../helpers/queryS.js";
 
 export const getEmpresaByIdService = async (id) => {
@@ -47,32 +48,31 @@ export const getSummaryService = async (id) => {
 }
 export const getSummaryCobradorService = async (id) => {
     try {
-        const querry = `select 
+        const fechaInicio = formatDateWithDateFns(new Date());
+        const query = `select 
                 (select sum(p.monto)
                 from pagos p join usuarios u 
                 on p.usuario_id = u.id 
                 where u.id = $1
-                and date(p.fecha_pago) between date(now()) and date(now()) ) as total_recaudado_hoy,
-
+                and date(p.fecha_pago) = $2 ) as total_recaudado_hoy,
                 (select sum(p.monto)
                 from pagos p join usuarios u 
                 on p.usuario_id = u.id 
                 where u.id = $1
                 and p.tipo_pago = 'qr'
-                and date(p.fecha_pago) between date(now()) and date(now()) ) as total_recaudado_hoy_qr,
+                and date(p.fecha_pago) = $2 ) as total_recaudado_hoy_qr,
                 (select sum(p.monto)
                 from pagos p join usuarios u 
                 on p.usuario_id = u.id 
                 where u.id = $1
                 and p.tipo_pago = 'efectivo'
-                and date(p.fecha_pago) between date(now()) and date(now()) ) as total_recaudado_hoy_efectivo,
-
+                and date(p.fecha_pago) = $2 ) as total_recaudado_hoy_efectivo,
                 (select sum(p.monto)
                 from pagos p join usuarios u 
                 on p.usuario_id = u.id 
                 where u.id = $1) as total_recaudado
                    ;`;
-        const empresa = await executeSelectOne(querry, [id]);
+        const empresa = await executeSelectOne(query, [id, fechaInicio]);
         return empresa[0];
     } catch (error) {
         console.error('Error en getSummaryService:', error);
