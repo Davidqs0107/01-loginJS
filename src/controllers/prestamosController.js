@@ -2,12 +2,14 @@ import { response } from "express";
 import { notFoundError } from "../constants/notfound.constants.js";
 import { crearPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
 import { estadoPrestamo } from "../constants/commons.constans.js";
+import { formatDateWithDateFns } from "../helpers/functions.js";
 
 export const getPrestamos = async (req, res) => {
-    const { page = 1, pageSize = 10, fecha_inicio = new Date().toISOString().split('T')[0], fecha_fin = new Date().toISOString().split('T')[0] } = req.query;
+    const fecha = formatDateWithDateFns(new Date());
+    const { page = 1, pageSize = 10, fecha_inicio = fecha, fecha_fin = fecha, searchTerm } = req.query;
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     try {
-        const result = await getPrestamosServices({ page, pageSize, empresa_id, fecha_inicio, fecha_fin });
+        const result = await getPrestamosServices({ page, pageSize, empresa_id, fecha_inicio, fecha_fin, searchTerm });
         return res.status(200).json({
             ok: true,
             prestamos: result.data,

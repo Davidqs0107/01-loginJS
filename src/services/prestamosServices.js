@@ -8,24 +8,38 @@ import fs from 'fs/promises';
 import moment from "moment";
 
 export const getPrestamosServices = async (data) => {
-    const { page, pageSize, empresa_id, fecha_inicio, fecha_fin } = data;
+    const { page, pageSize, empresa_id, fecha_inicio, fecha_fin, searchTerm } = data;
+
     try {
-        const prestamos = await executeSelect(
-            `SELECT p.*, c.nombre ,c.apellido ,c.telefono ,c.direccion ,c.direccion ,c.email 
-                FROM prestamos p join clientes c 
-                on p.cliente_id = c.id 
-                WHERE p.empresa_id = $1
-                and p.fecha_inicio between $2 and $3
-                and p.estado = true`,
-            [empresa_id, fecha_inicio, fecha_fin],
-            parseInt(page, 10),
-            parseInt(pageSize, 10)
-        );
+        let query = `
+            SELECT p.*, c.nombre, c.apellido, c.telefono, c.direccion, c.email
+            FROM prestamos p
+            JOIN clientes c ON p.cliente_id = c.id
+            WHERE p.empresa_id = $1 AND p.estado = true
+        `;
+
+        const queryParams = [empresa_id];
+
+        if (searchTerm) {
+            // Si hay searchTerm, ignoramos las fechas
+            query += ` AND (c.nombre ILIKE $2 OR c.apellido ILIKE $2 OR c.ci = $3)`;
+            queryParams.push(`%${searchTerm}%`, searchTerm);
+        } else {
+            // Si NO hay searchTerm, aplicamos el filtro de fechas
+            query += ` AND p.fecha_inicio BETWEEN $2 AND $3`;
+            queryParams.push(fecha_inicio, fecha_fin);
+        }
+
+        // **Ejecutar la consulta con paginación**
+        const prestamos = await executeSelect(query, queryParams, parseInt(page, 10), parseInt(pageSize, 10));
+
         return prestamos;
     } catch (error) {
-        throw error;
+        console.error("Error en getPrestamosServices:", error);
+        throw new Error("Error al obtener los préstamos.");
     }
-}
+};
+
 
 export const getPrestamosByIdService = async (id, empresa_id, mostrarCuotas) => {
     try {

@@ -72,7 +72,7 @@ export const loginService = async (data) => {
         const emailLowerCase = email.toLowerCase();
         const query = `
             SELECT u.id, u.nombre, u.email, u.password, u.empresa_id, u.rol,ep.fecha_fin ,ep.estado as "empresaEstado",u.estado
-            , ep,plan_id
+            , ep.plan_id
             FROM usuarios u join empresa_planes ep 
             on u.empresa_id = ep.empresa_id 
             WHERE email = $1`;
