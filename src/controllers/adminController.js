@@ -2,8 +2,8 @@ import { estadoEmpresaPlanes } from "../constants/empresa_planes.constanst.js";
 import { getEmpresaByNameService, getEmpresasService, getPlanesService, getUsuariosByEmpresaService, updateEmpresaPlanService } from "../services/adminService.js";
 import { formatDateWithDateFns } from "../helpers/functions.js"
 export const getEmpresas = async (req, res = response) => {
-    const date = formatDateWithDateFns(new Date());
-    const { page = 1, pageSize = 10, fecha_inicio = date, fecha_fin = date } = req.query;
+    const dateNow = formatDateWithDateFns(new Date());
+    const { page = 1, pageSize = 10, fecha_inicio = dateNow, fecha_fin = dateNow } = req.query;
     try {
         const { data, meta } = await getEmpresasService({ page, pageSize, fecha_inicio, fecha_fin });
         res.status(200).json({

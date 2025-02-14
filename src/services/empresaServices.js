@@ -36,7 +36,15 @@ export const getSummaryService = async (id) => {
                 (select sum(p.monto)
                 from pagos p join usuarios u 
                 on p.usuario_id = u.id 
-                where u.empresa_id = $1) as total_recaudado
+                where u.empresa_id = $1) as total_recaudado,
+                (select sum(d.monto) 
+                from descargos d
+                where d.empresa_id = $1 
+                and (d.estado ='pendiente'))as descargos_pendientes,
+                (select sum(d.monto) 
+                from descargos d
+                where d.empresa_id = $1 
+                and (d.estado ='aprobado'))as descargos_completados
                    ;`;
         const empresa = await executeSelectOne(querry, [id]);
         return empresa[0];
@@ -70,7 +78,17 @@ export const getSummaryCobradorService = async (id) => {
                 (select sum(p.monto)
                 from pagos p join usuarios u 
                 on p.usuario_id = u.id 
-                where u.id = $1) as total_recaudado
+                where u.id = $1) as total_recaudado,
+                
+                (select sum(d.monto) 
+                from descargos d
+                where d.usuario_id = $1 
+                and (d.estado ='pendiente'))as descargos_pendientes,
+
+                (select sum(d.monto) 
+                from descargos d
+                where d.usuario_id = $1 
+                and (d.estado ='aprobado'))as descargos_completados
                    ;`;
         const empresa = await executeSelectOne(query, [id, fechaInicio]);
         return empresa[0];

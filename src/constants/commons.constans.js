@@ -24,3 +24,14 @@ export const tipoPrestamoInteresEnum = {
     cuota: "cuota",
     fijo: "fijo",
 }
+
+export const tipoPago = {
+    efectivo: "efectivo",
+    qr: "qr",
+}
+
+export const estadoDescargo = {
+    pendiente: "pendiente",
+    aprobado: "aprobado",
+    rechazado: "rechazado",
+}
