@@ -1,5 +1,5 @@
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearPagoService, eliminarPagoService, getPagosbyCuotaIdServices, getPagosByIdServices, getPagosbyUserIdServices } from "../services/pagosServices.js";
+import { crearMultipagoService, crearPagoService, eliminarPagoService, getPagosbyCuotaIdServices, getPagosByIdServices, getPagosbyUserIdServices } from "../services/pagosServices.js";
 
 export const getPagosbyUserId = async (req, res) => {
     const { page = 1, pageSize = 10 } = req.query;
@@ -66,10 +66,50 @@ export const crearPago = async (req, res) => {
         console.error('Error en crearPago:', message);
         return res.status(500).json({ ok: false, msg: message });
     }
-
-
 }
+/**
+ * Controlador para registrar un multipago a un préstamo.
+ * Aplica el monto total pagado a las cuotas pendientes en orden.
+ */
+export const crearMultipago = async (req, res) => {
+    // 1. Recoger datos y agregar IDs desde el middleware
+    const data = req.body;
+    // data.empresa_id = req.empresa_id; // Si fuera necesario para el contexto, aunque no se usa en el servicio
+    data.usuario_id = req.id; // ID del usuario que registra el pago (desde el middleware)
 
+    // Se asume que el body contiene: { prestamo_id, montoTotal, fecha_pago, tipo_pago }
+
+    try {
+        // 2. Llamar al nuevo servicio de multipago
+        const { pagosRealizados, montoExcedente, montoTotal, mensaje } = await crearMultipagoService(data);
+
+        // 3. Responder al cliente
+        res.status(201).json({
+            ok: true,
+            msg: mensaje, // El mensaje incluye la información del excedente
+            montoTotalPagado: montoTotal,
+            montoExcedente: montoExcedente,
+            totalCuotasAfectadas: pagosRealizados.length,
+            // Opcionalmente, devolver la lista detallada de los pagos realizados
+            pagos: pagosRealizados.map(p => ({
+                pagoId: p.pagoId,
+                cuotaId: p.cuota.id,
+                numeroCuota: p.cuota.numero_cuota,
+                montoAplicado: p.montoAplicado,
+                estadoFinal: p.cuota.estado
+            })),
+        });
+
+    } catch (error) {
+        console.error('Error en crearMultipago:', error.message);
+        // Devolver un error 500 o 400 si el error es de validación/negocio
+        const statusCode = error.message.includes('No tiene cuotas') || error.message.includes('positivos') ? 400 : 500;
+        return res.status(statusCode).json({
+            ok: false,
+            msg: error.message
+        });
+    }
+};
 // export const actualizarPago = async (req, res) => {
 //     const { id } = req.params;
 //     const data = req.body;
