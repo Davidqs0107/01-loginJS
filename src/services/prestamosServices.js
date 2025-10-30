@@ -16,6 +16,7 @@ export const getPrestamosServices = async (data) => {
             FROM prestamos p
             JOIN clientes c ON p.cliente_id = c.id
             WHERE p.empresa_id = $1 AND p.estado = true
+            and c.estado = true
         `;
 
         const queryParams = [empresa_id];

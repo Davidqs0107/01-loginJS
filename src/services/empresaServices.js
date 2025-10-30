@@ -17,8 +17,10 @@ export const getSummaryService = async (id) => {
     try {
         const querry = `select 
                 (select count(p.id) 
-                 from prestamos p 
+                 from prestamos p join clientes c
+                 on p.cliente_id = c.id
                  where p.empresa_id = $1 
+                    and c.estado = true
                    and (p.estado_prestamo = 'pendiente' or p.estado_prestamo = 'activo')) as prestamos_pendientes,
                 (select count(p.id) 
                  from prestamos p 
