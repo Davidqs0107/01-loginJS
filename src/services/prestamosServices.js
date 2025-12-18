@@ -12,9 +12,14 @@ export const getPrestamosServices = async (data) => {
 
     try {
         let query = `
-            SELECT p.*, c.nombre, c.apellido, c.telefono, c.direccion, c.email
+            SELECT p.*, 
+                   c.nombre, c.apellido, c.telefono, c.direccion, c.email,
+                   COALESCE(SUM(cu.monto), 0) as monto_total_cuotas,
+                   COALESCE(SUM(cu.monto_pagado), 0) as monto_pagado,
+                   COALESCE(SUM(cu.monto), 0) - COALESCE(SUM(cu.monto_pagado), 0) as saldo
             FROM prestamos p
             JOIN clientes c ON p.cliente_id = c.id
+            LEFT JOIN cuotas cu ON cu.prestamo_id = p.id
             WHERE p.empresa_id = $1 AND p.estado = true
             and c.estado = true
         `;
@@ -30,6 +35,8 @@ export const getPrestamosServices = async (data) => {
             query += ` AND p.fecha_inicio BETWEEN $2 AND $3`;
             queryParams.push(fecha_inicio, fecha_fin);
         }
+
+        query += ` GROUP BY p.id, c.id`;
 
         // **Ejecutar la consulta con paginación**
         const prestamos = await executeSelect(query, queryParams, parseInt(page, 10), parseInt(pageSize, 10));
@@ -61,7 +68,7 @@ export const getPrestamosByIdService = async (id, empresa_id, mostrarCuotas) => 
                 `SELECT * FROM cuotas 
                 WHERE prestamo_id = $1
                 order by numero_cuota asc`,
-                [id], 1, 1000
+                [id], 1, 10000
             );
             prestamo[0].cuotas = data;
         }
