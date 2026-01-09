@@ -82,3 +82,49 @@ export const getEmpresaByNameService = async (nombre) => {
         throw error;
     }
 }
+
+export const limpiarDatosEmpresaService = async (empresaId) => {
+    try {
+        // Iniciar transacción y eliminar en orden respetando foreign keys
+        const queries = [
+            // 1. Eliminar pagos relacionados con cuotas de préstamos de la empresa
+            `DELETE FROM pagos WHERE cuota_id IN (
+                SELECT c.id FROM cuotas c 
+                JOIN prestamos p ON c.prestamo_id = p.id 
+                WHERE p.empresa_id = $1
+            )`,
+            // 2. Eliminar cuotas de préstamos de la empresa
+            `DELETE FROM cuotas WHERE prestamo_id IN (
+                SELECT id FROM prestamos WHERE empresa_id = $1
+            )`,
+            // 3. Eliminar archivos de préstamos de la empresa
+            `DELETE FROM prestamo_archivos WHERE prestamo_id IN (
+                SELECT id FROM prestamos WHERE empresa_id = $1
+            )`,
+            // 4. Eliminar préstamos de la empresa
+            `DELETE FROM prestamos WHERE empresa_id = $1`,
+            // 5. Eliminar descargos de la empresa
+            `DELETE FROM descargos WHERE empresa_id = $1`,
+            // 6. Eliminar clientes de la empresa
+            `DELETE FROM clientes WHERE empresa_id = $1`
+        ];
+
+        const results = {};
+
+        // Ejecutar cada query y capturar el número de registros eliminados
+        for (const query of queries) {
+            const result = await executeQuery(query, [empresaId]);
+            // Extraer el nombre de la tabla del query
+            const tableName = query.match(/DELETE FROM (\w+)/)[1];
+            results[tableName] = result.rowCount || 0;
+        }
+
+        return {
+            success: true,
+            message: 'Datos de la empresa eliminados correctamente',
+            detalles: results
+        };
+    } catch (error) {
+        throw error;
+    }
+}

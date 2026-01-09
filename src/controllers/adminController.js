@@ -1,5 +1,5 @@
 import { estadoEmpresaPlanes } from "../constants/empresa_planes.constanst.js";
-import { getEmpresaByNameService, getEmpresasService, getPlanesService, getUsuariosByEmpresaService, updateEmpresaPlanService } from "../services/adminService.js";
+import { getEmpresaByNameService, getEmpresasService, getPlanesService, getUsuariosByEmpresaService, limpiarDatosEmpresaService, updateEmpresaPlanService } from "../services/adminService.js";
 import { formatDateWithDateFns } from "../helpers/functions.js"
 export const getEmpresas = async (req, res = response) => {
     const dateNow = formatDateWithDateFns(new Date());
@@ -78,6 +78,22 @@ export const getEmpresaByName = async (req, res = response) => {
         res.status(500).json({
             ok: false,
             msg: error,
+        });
+    }
+}
+
+export const limpiarDatosEmpresa = async (req, res = response) => {
+    const { empresa_id } = req.params;
+    try {
+        const result = await limpiarDatosEmpresaService(empresa_id);
+        res.status(200).json({
+            ok: true,
+            ...result
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            msg: error.message || 'Error al limpiar datos de la empresa',
         });
     }
 }
