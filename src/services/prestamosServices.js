@@ -112,12 +112,15 @@ export const getPrestamosByClientIdServices = async (data) => {
 export const crearPrestamoService = async (data) => {
     const { cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo, documento } = data;
     try {
+        // Normalizar fecha_inicio a UTC para evitar problemas de zona horaria
+        const fechaInicioUTC = moment.utc(fecha_inicio).format("YYYY-MM-DD");
+
         const prestamo = await executeTransaction(async (client) => {
             const query = `
                 INSERT INTO prestamos (cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo,documento)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10)
                 RETURNING *`;
-            const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo, documento]);
+            const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fechaInicioUTC, tipo_prestamo, documento]);
             const idPrestamo = prestamoResult.rows[0].id;
             // Calcular las cuotas
             const calcularCuotasFn =
@@ -127,7 +130,7 @@ export const crearPrestamoService = async (data) => {
                 tasaInteres: tasa_interes,
                 totalCuotas: total_cuotas,
                 frecuenciaPago: frecuencia_pago,
-                fechaInicio: fecha_inicio,
+                fechaInicio: fechaInicioUTC,
             });
 
             // Insertar múltiples cuotas en una sola consulta
