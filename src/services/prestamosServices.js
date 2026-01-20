@@ -256,7 +256,7 @@ const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuencia
 
     for (let i = 1; i <= totalCuotas; i++) {
         const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 15 : i; // Quincenal: 15 días por cuota
-        const fechaPago = moment(fechaInicio)
+        const fechaPago = moment.utc(fechaInicio)
             .add(cantidad, frecuenciaUnidad)
             .format("YYYY-MM-DD");
 
@@ -315,7 +315,7 @@ const calcularCuotas = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fecha
 
     for (let i = 1; i <= totalCuotas; i++) {
         const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 15 : i; // Quincenal: 15 días por cuota
-        const fechaPago = moment(fechaInicio)
+        const fechaPago = moment.utc(fechaInicio)
             .add(cantidad, frecuenciaUnidad)
             .format("YYYY-MM-DD");
         cuotas.push({
