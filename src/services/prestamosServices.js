@@ -249,13 +249,13 @@ const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuencia
     const montoInt = parseFloat(monto);
     const montoInteres = parseFloat((montoInt * (tasaInteres / 100)).toFixed(2)); // Interés fijo por periodo
     const frecuenciaUnidad =
-        frecuenciaPago === frecuenciaPagoEnum.quincenal ? "weeks" : // Quincenal como semanas
+        frecuenciaPago === frecuenciaPagoEnum.quincenal ? "days" : // Quincenal en días
             frecuenciaPago === frecuenciaPagoEnum.diario ? "days" :
                 frecuenciaPago === frecuenciaPagoEnum.semanal ? "weeks" :
                     frecuenciaPago === frecuenciaPagoEnum.anual ? "years" : "months";
 
     for (let i = 1; i <= totalCuotas; i++) {
-        const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 2 - 1 : i; // Manejo especial para quincenal
+        const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 15 : i; // Quincenal: 15 días por cuota
         const fechaPago = moment(fechaInicio)
             .add(cantidad, frecuenciaUnidad)
             .format("YYYY-MM-DD");
@@ -295,7 +295,7 @@ const calcularCuotas = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fecha
             frecuenciaUnidad = "weeks";
             break;
         case frecuenciaPagoEnum.quincenal:
-            frecuenciaUnidad = "weeks";
+            frecuenciaUnidad = "days";
             break;
         case frecuenciaPagoEnum.mensual:
             frecuenciaUnidad = "months";
@@ -314,7 +314,7 @@ const calcularCuotas = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fecha
     }
 
     for (let i = 1; i <= totalCuotas; i++) {
-        const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 2 - 1 : i; // Casos como quincenal
+        const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 15 : i; // Quincenal: 15 días por cuota
         const fechaPago = moment(fechaInicio)
             .add(cantidad, frecuenciaUnidad)
             .format("YYYY-MM-DD");
