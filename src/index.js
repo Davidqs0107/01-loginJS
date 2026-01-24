@@ -18,6 +18,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Importar job de notificaciones
+import notificacionesCuotasJob from './jobs/notificacionesCuotasJob.js';
+import { verificarConfiguracion } from './services/emailService.js';
+
 const app = express();
 const PORT = process.env.PORT;
 
@@ -46,6 +50,18 @@ app.use((req, res, next) => {
         msg: "Ruta no encontrada",
     });
 });
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Servicio levantado en el puerto: ${PORT}`);
+
+    // Verificar configuración de email
+    console.log('\n📧 Verificando configuración de email...');
+    const emailConfigOk = await verificarConfiguracion();
+
+    if (emailConfigOk) {
+        // Iniciar cron job de notificaciones
+        notificacionesCuotasJob.iniciar();
+    } else {
+        console.log('⚠️ No se pudo iniciar el sistema de notificaciones por email');
+        console.log('⚠️ Verifica las variables de entorno de configuración de email');
+    }
 });
