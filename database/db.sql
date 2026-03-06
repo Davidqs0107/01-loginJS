@@ -313,3 +313,30 @@ CREATE TABLE prestamo_archivos (
 	CONSTRAINT prestamo_archivos_pkey PRIMARY KEY (id),
 	CONSTRAINT prestamo_archivos_prestamo_id_fkey FOREIGN KEY (prestamo_id) REFERENCES prestamos(id) ON DELETE CASCADE
 );
+
+
+-- public.notificaciones_enviadas definition
+
+-- Drop table
+
+-- DROP TABLE notificaciones_enviadas;
+
+CREATE TABLE notificaciones_enviadas (
+	id int8 GENERATED ALWAYS AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,
+	cuota_id int8 NOT NULL,
+	cliente_id int8 NOT NULL,
+	tipo varchar(20) NOT NULL,
+	destinatario text NOT NULL,
+	estado varchar(20) DEFAULT 'enviado'::character varying NULL,
+	mensaje text NULL,
+	error_mensaje text NULL,
+	fecha_envio timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
+	created_at timestamptz DEFAULT CURRENT_TIMESTAMP NULL,
+	CONSTRAINT notificaciones_enviadas_pkey PRIMARY KEY (id),
+	CONSTRAINT notificaciones_enviadas_tipo_check CHECK ((tipo = ANY (ARRAY['email'::text, 'whatsapp'::text, 'sms'::text]))),
+	CONSTRAINT notificaciones_enviadas_estado_check CHECK ((estado = ANY (ARRAY['enviado'::text, 'fallido'::text, 'pendiente'::text]))),
+	CONSTRAINT notificaciones_enviadas_cuota_id_fkey FOREIGN KEY (cuota_id) REFERENCES cuotas(id) ON DELETE CASCADE,
+	CONSTRAINT notificaciones_enviadas_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+);
+CREATE INDEX notificaciones_cuota_idx ON public.notificaciones_enviadas USING btree (cuota_id, tipo, estado);
+CREATE INDEX notificaciones_fecha_idx ON public.notificaciones_enviadas USING btree (fecha_envio);
