@@ -10,6 +10,7 @@ import cuotasRouter from './routes/cuotasRoutes.js';
 import pagosRouter from './routes/pagosRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import descargoRouter from './routes/descargoRoutes.js';
+import reportesRouter from './routes/reportesRoutes.js';
 import fileUpload from 'express-fileupload';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -43,6 +44,7 @@ app.use('/api/prestamos', prestamosRouter);
 app.use('/api/cuotas', cuotasRouter);
 app.use('/api/pagos', pagosRouter);
 app.use('/api/descargos', descargoRouter);
+app.use('/api/reportes', reportesRouter);
 //middleware para rutas no encontradas
 app.use((req, res, next) => {
     res.status(404).json({
