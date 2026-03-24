@@ -6,6 +6,7 @@ import {
     getReporteAgendaService,
     getReporteRecaudacionService,
     getReporteFichaClienteService,
+    getReportePrestamosClienteService,
 } from '../services/reportesService.js';
 
 // Fecha de hoy en formato YYYY-MM-DD
@@ -148,5 +149,37 @@ export const getReporteFichaCliente = async (req, res = response) => {
     } catch (error) {
         console.error('Error en getReporteFichaCliente:', error);
         return res.status(500).json({ ok: false, msg: 'Error al generar ficha del cliente' });
+    }
+};
+
+/**
+ * GET /api/reportes/prestamos
+ * Query params: searchTerm, estado_prestamo, fecha_inicio, fecha_fin, page, pageSize
+ */
+export const getReportePrestamosCliente = async (req, res = response) => {
+    const { empresa_id } = req;
+    const {
+        searchTerm,
+        estado_prestamo,
+        fecha_inicio,
+        fecha_fin,
+        page = 1,
+        pageSize = 20,
+    } = req.query;
+
+    try {
+        const result = await getReportePrestamosClienteService({
+            empresa_id,
+            searchTerm,
+            estado_prestamo,
+            fecha_inicio,
+            fecha_fin,
+            page,
+            pageSize,
+        });
+        return res.status(200).json({ ok: true, ...result });
+    } catch (error) {
+        console.error('Error en getReportePrestamosCliente:', error);
+        return res.status(500).json({ ok: false, msg: 'Error al generar reporte de préstamos por cliente' });
     }
 };

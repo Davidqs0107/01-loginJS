@@ -9,6 +9,7 @@ import {
     getReporteAgenda,
     getReporteRecaudacion,
     getReporteFichaCliente,
+    getReportePrestamosCliente,
 } from '../controllers/reportesController.js';
 
 const { admin, superAdmin, cobrador } = userRol;
@@ -35,5 +36,8 @@ route.get('/recaudacion', [validarRol(admin, superAdmin)], getReporteRecaudacion
 
 // GET /api/reportes/cliente/:clienteId
 route.get('/cliente/:clienteId', [validarRol(admin, superAdmin)], getReporteFichaCliente);
+
+// GET /api/reportes/prestamos?searchTerm=juan&estado_prestamo=activo&fecha_inicio=2026-01-01&fecha_fin=2026-03-31
+route.get('/prestamos', [validarRol(admin, superAdmin)], getReportePrestamosCliente);
 
 export default route;

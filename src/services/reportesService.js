@@ -249,3 +249,90 @@ export const getReporteFichaClienteService = async ({ empresa_id, cliente_id }) 
 
     return { cliente: clienteRows[0] || null, prestamos };
 };
+
+/**
+ * Reporte 7: Préstamos por Cliente (búsqueda)
+ * Lista paginada de préstamos filtrando por nombre, CI o teléfono del cliente.
+ * Filtros opcionales: estado_prestamo, fecha_inicio, fecha_fin del préstamo.
+ */
+export const getReportePrestamosClienteService = async ({
+    empresa_id,
+    searchTerm,
+    estado_prestamo,
+    fecha_inicio,
+    fecha_fin,
+    page = 1,
+    pageSize = 20,
+}) => {
+    const params = [empresa_id];
+    let paramIdx = 2;
+    let extraFilters = '';
+
+    if (searchTerm) {
+        extraFilters += ` AND (
+            LOWER(c.nombre || ' ' || c.apellido) ILIKE $${paramIdx}
+            OR LOWER(c.ci)      ILIKE $${paramIdx}
+            OR LOWER(c.telefono) ILIKE $${paramIdx}
+        )`;
+        params.push(`%${searchTerm.toLowerCase()}%`);
+        paramIdx++;
+    }
+
+    if (estado_prestamo) {
+        extraFilters += ` AND p.estado_prestamo = $${paramIdx}`;
+        params.push(estado_prestamo);
+        paramIdx++;
+    }
+
+    if (fecha_inicio) {
+        extraFilters += ` AND p.fecha_inicio >= $${paramIdx}`;
+        params.push(fecha_inicio);
+        paramIdx++;
+    }
+
+    if (fecha_fin) {
+        extraFilters += ` AND p.fecha_inicio <= $${paramIdx}`;
+        params.push(fecha_fin);
+        paramIdx++;
+    }
+
+    const query = `
+        SELECT
+            c.id                                AS cliente_id,
+            c.nombre || ' ' || c.apellido       AS cliente,
+            c.ci,
+            c.telefono,
+            c.direccion,
+            p.id                                AS prestamo_id,
+            p.monto                             AS capital,
+            p.tasa_interes,
+            p.frecuencia_pago,
+            p.total_cuotas                      AS total_cuotas_plan,
+            p.fecha_inicio,
+            p.estado_prestamo,
+            p.tipo_prestamo,
+            COUNT(cu.id)                                                        AS total_cuotas,
+            COUNT(cu.id) FILTER (WHERE cu.estado = 'pagada')                    AS cuotas_pagadas,
+            COUNT(cu.id) FILTER (WHERE cu.estado IN ('pendiente', 'parcial'))   AS cuotas_pendientes,
+            COALESCE(SUM(cu.monto_pagado), 0)                                   AS total_pagado,
+            COALESCE(SUM(cu.monto), 0)                                          AS total_a_pagar,
+            COALESCE(SUM(cu.monto - cu.monto_pagado)
+                FILTER (WHERE cu.estado IN ('pendiente', 'parcial')), 0)        AS saldo_pendiente,
+            u.nombre || ' ' || u.apellido       AS cobrador
+        FROM prestamos p
+        JOIN clientes  c  ON p.cliente_id  = c.id
+        JOIN cuotas    cu ON cu.prestamo_id = p.id
+        JOIN usuarios  u  ON p.usuario_id  = u.id
+        WHERE p.empresa_id = $1
+            AND c.estado = true
+            ${extraFilters}
+        GROUP BY
+            c.id, c.nombre, c.apellido, c.ci, c.telefono, c.direccion,
+            p.id, p.monto, p.tasa_interes, p.frecuencia_pago, p.total_cuotas,
+            p.fecha_inicio, p.estado_prestamo, p.tipo_prestamo,
+            u.nombre, u.apellido
+        ORDER BY c.apellido ASC, p.fecha_inicio DESC
+    `;
+
+    return await executeSelect(query, params, parseInt(page), parseInt(pageSize));
+};
