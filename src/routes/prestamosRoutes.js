@@ -5,7 +5,7 @@ import { check } from "express-validator";
 import { crearPrestamo, deleteFile, getPrestamos, getPrestamosByClientId, getPrestamosById, getPrestamosByUserId, getUploadFile, updatePrestamo, uploadFile } from "../controllers/prestamosController.js";
 import { validarRol } from "../middlewares/validar-rol.js";
 import { userRol } from "../constants/usuarios.constants.js";
-const { superAdmin, admin } = userRol;
+const { superAdmin, admin, cobrador } = userRol;
 const route = Router();
 route.use(validarJWT);
 
@@ -22,7 +22,7 @@ route.post('/', [
     check('total_cuotas', 'El campo total_cuotas es obligatorio').not().isEmpty(),
     check('fecha_inicio', 'El campo fecha_inicio es obligatorio').not().isEmpty(),
     validarCampos,
-    validarRol(superAdmin, admin)
+    // validarRol(superAdmin, admin, cobrador)
 ], crearPrestamo);
 route.put('/:id', [
     check('documento', 'El campo documento es obligatorio').not().isEmpty(),
