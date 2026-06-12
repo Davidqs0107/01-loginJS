@@ -5,6 +5,7 @@ import { response } from "express"
 import { pool } from "../db.js";
 import bcrypt from 'bcrypt';
 import { createUsuarioService, getUsuarioByIdService, getUsuariosCobradoresServices, getUsuariosServices, softDeleteUsuarioService, updateUsuarioService } from "../services/userServices.js";
+import { getPlanMaxUsuariosService } from "../services/adminService.js";
 import { userRol } from "../constants/usuarios.constants.js";
 import { notFoundError } from "../constants/notfound.constants.js";
 
@@ -57,12 +58,16 @@ export const createUsuario = async (req, res = response) => {
     const plan_id = req.plan_id || 1;
     const email = emailnot.toLowerCase();
     try {
-        if (plan_id < 3) {
-            const userExist = await getUsuariosCobradoresServices({ empresa_id });
-            if (userExist.count > 0) return res.status(403).json({
-                ok: false,
-                msg: 'No puede crear mas usuarios con este plan'
-            })
+        const plan = await getPlanMaxUsuariosService(plan_id);
+        if (plan.max_usuarios !== null) {
+            const countResult = await getUsuariosCobradoresServices({ empresa_id });
+            const currentCount = parseInt(countResult.count || countResult[0]?.count || 0);
+            if (currentCount >= plan.max_usuarios) {
+                return res.status(403).json({
+                    ok: false,
+                    msg: `Límite de usuarios alcanzado (${plan.max_usuarios})`
+                });
+            }
         }
         const newUser = await createUsuarioService({
             nombre,

@@ -1,6 +1,6 @@
 import { response } from "express";
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
+import { crearPrestamoService, completarPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
 import { estadoPrestamo } from "../constants/commons.constans.js";
 import { formatDateWithDateFns } from "../helpers/functions.js";
 
@@ -184,6 +184,23 @@ export const deleteFile = async (req, res = response) => {
             ok: false,
             error: 'Error interno del servidor',
             details: error.message,
+        });
+    }
+};
+
+export const completarPrestamo = async (req, res = response) => {
+    const { id } = req.params;
+    try {
+        const result = await completarPrestamoService(id);
+        return res.status(200).json({
+            ok: true,
+            prestamo: result
+        });
+    } catch (error) {
+        console.error('Error en completarPrestamo:', error);
+        return res.status(500).json({
+            ok: false,
+            msg: error.message || 'Error al completar el préstamo'
         });
     }
 };

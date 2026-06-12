@@ -128,3 +128,30 @@ export const limpiarDatosEmpresaService = async (empresaId) => {
         throw error;
     }
 }
+
+export const getPlanMaxUsuariosService = async (plan_id) => {
+    try {
+        const plan = await executeSelectOne(
+            'SELECT id, max_usuarios FROM planes WHERE id = $1',
+            [plan_id]
+        );
+        return plan[0] || { max_usuarios: null };
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const updatePlanMaxUsuariosService = async (id, max_usuarios) => {
+    try {
+        const result = await executeQuery(
+            'UPDATE planes SET max_usuarios = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+            [max_usuarios, id]
+        );
+        if (result.length === 0) {
+            throw new Error('Plan no encontrado');
+        }
+        return result[0];
+    } catch (error) {
+        throw error;
+    }
+};

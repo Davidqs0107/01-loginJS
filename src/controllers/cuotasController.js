@@ -49,11 +49,11 @@ export const getCuotasByUserId = async (req, res) => {
     }
 }
 export const getCuotasByClientId = async (req, res) => {
-    const { client_id } = req.params;
+    const { cliente_id } = req.params;
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     const { page = 1, pageSize = 10 } = req.query;
     try {
-        const result = await getCuotasByClientIdServices({ page, pageSize, id: client_id, empresa_id });
+        const result = await getCuotasByClientIdServices({ page, pageSize, id: cliente_id, empresa_id });
         return res.status(200).json({
             ok: true,
             cuotas: result.data,

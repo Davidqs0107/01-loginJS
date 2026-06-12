@@ -271,4 +271,25 @@ export const eliminarPagoService = async (pagoId) => {
     } catch (error) {
         throw error;
     }
+}
+
+export const getPagosService = async (empresa_id, fecha_inicio, fecha_fin) => {
+    try {
+        const pagos = await executeSelect(
+            `SELECT p.*, c.numero_cuota, c.monto as monto_cuota, c.monto_pagado,
+                    cl.nombre as cliente_nombre, cl.apellido as cliente_apellido,
+                    pr.monto as prestamo_monto
+             FROM pagos p
+             JOIN cuotas c ON p.cuota_id = c.id
+             JOIN prestamos pr ON c.prestamo_id = pr.id
+             JOIN clientes cl ON pr.cliente_id = cl.id
+             WHERE pr.empresa_id = $1
+             AND p.fecha_pago BETWEEN $2 AND $3
+             ORDER BY p.fecha_pago DESC`,
+            [empresa_id, fecha_inicio, fecha_fin]
+        );
+        return pagos;
+    } catch (error) {
+        throw error;
+    }
 };

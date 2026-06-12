@@ -2,11 +2,12 @@ import { Router } from "express";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarCampos } from "../middlewares/validar-campos.js";
 import { check } from "express-validator";
-import { crearCliente, getClienteById, getClientes, softDeleteCliente, updateCliente } from "../controllers/clientesController.js";
+import { crearCliente, getClienteById, getClientes, softDeleteCliente, updateCliente, searchClientes } from "../controllers/clientesController.js";
 const route = Router();
 route.use(validarJWT);
 
 route.get('/', getClientes);
+route.get('/buscar', searchClientes);
 route.get('/:id', getClienteById);
 route.post('/', [
     check('nombre', 'El nombre es obligatorio').not().isEmpty(),

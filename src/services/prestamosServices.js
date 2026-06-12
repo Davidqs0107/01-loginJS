@@ -247,6 +247,22 @@ export const deleteFileService = async (prestamoId, archivoId) => {
     }
 }
 
+export const completarPrestamoService = async (id) => {
+    try {
+        const result = await executeQuery(
+            `UPDATE prestamos SET estado_prestamo = 'completado', updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1 RETURNING *`,
+            [id]
+        );
+        if (result.length === 0) {
+            throw new Error('Préstamo no encontrado');
+        }
+        return result[0];
+    } catch (error) {
+        throw error;
+    }
+};
+
 const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {
     const cuotas = [];
     const montoInt = parseFloat(monto);

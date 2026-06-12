@@ -1,5 +1,5 @@
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearMultipagoService, crearPagoService, eliminarPagoService, getPagosbyCuotaIdServices, getPagosByIdServices, getPagosbyUserIdServices } from "../services/pagosServices.js";
+import { crearMultipagoService, crearPagoService, eliminarPagoService, getPagosbyCuotaIdServices, getPagosByIdServices, getPagosbyUserIdServices, getPagosService } from "../services/pagosServices.js";
 
 export const getPagosbyUserId = async (req, res) => {
     const { page = 1, pageSize = 10 } = req.query;
@@ -141,5 +141,21 @@ export const eliminarPago = async (req, res) => {
             return res.status(400).json({ msg: notFoundError.pagoNotFound });
         }
         return res.status(500).json({ msg: 'Error al eliminar el pago.', error });
+    }
+}
+
+export const getPagos = async (req, res) => {
+    const { fecha_inicio, fecha_fin } = req.query;
+    const empresa_id = req.empresa_id;
+    try {
+        const pagos = await getPagosService(empresa_id, fecha_inicio, fecha_fin);
+        return res.status(200).json({
+            ok: true,
+            pagos: pagos.data || pagos,
+            meta: pagos.meta
+        });
+    } catch (error) {
+        console.error('Error en getPagos:', error);
+        res.status(500).json({ ok: false, msg: 'Error al obtener los pagos.' });
     }
 }

@@ -1,5 +1,5 @@
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearClienteService, getClienteByIdService, getClientesServices, sofDeleteClientesService, updateClientesService } from "../services/clientesServices.js";
+import { crearClienteService, getClienteByIdService, getClientesServices, searchClientesService, sofDeleteClientesService, updateClientesService } from "../services/clientesServices.js";
 
 export const getClientes = async (req, res) => {
     const { page = 1, pageSize = 10 } = req.query;
@@ -96,5 +96,20 @@ export const softDeleteCliente = async (req, res) => {
     } catch (error) {
         console.error('Error en softDeleteCliente:', error);
         res.status(500).json({ msg: 'Error al eliminar el cliente.' });
+    }
+}
+
+export const searchClientes = async (req, res) => {
+    const { q = '' } = req.query;
+    const empresa_id = req.empresa_id;
+    try {
+        const clientes = await searchClientesService(q, empresa_id);
+        return res.status(200).json({
+            ok: true,
+            clientes: clientes.data || clientes
+        });
+    } catch (error) {
+        console.error('Error en searchClientes:', error);
+        res.status(500).json({ ok: false, msg: 'Error al buscar clientes.' });
     }
 }

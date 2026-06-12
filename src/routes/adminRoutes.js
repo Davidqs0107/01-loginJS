@@ -2,7 +2,7 @@
 /api/admin
 */
 import { Router } from "express";
-import { getEmpresaByName, getEmpresas, getPlanes, getUsuariosByEmpresa, limpiarDatosEmpresa, updateEmpresaPlan } from "../controllers/adminController.js";
+import { getEmpresaByName, getEmpresas, getPlanes, getUsuariosByEmpresa, limpiarDatosEmpresa, updateEmpresaPlan, updatePlanMaxUsuarios } from "../controllers/adminController.js";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarRol } from "../middlewares/validar-rol.js";
 import { userRol } from "../constants/usuarios.constants.js";
@@ -18,6 +18,7 @@ route.get('/usuarios/:empresa_id', [validarRol(superAdmin)], getUsuariosByEmpres
 route.get('/empresas/:find', [validarRol(superAdmin)], getEmpresaByName);
 route.get('/planes', [validarRol(superAdmin)], getPlanes);
 route.put('/', [validarRol(superAdmin)], updateEmpresaPlan);
+route.put('/planes/:id', [validarRol(superAdmin)], updatePlanMaxUsuarios);
 route.delete('/limpiar/:empresa_id', [validarRol(superAdmin)], limpiarDatosEmpresa);
 
 // Endpoint para ejecutar manualmente el job de notificaciones (útil para pruebas)

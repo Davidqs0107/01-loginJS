@@ -2,10 +2,11 @@ import { Router } from "express";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarCampos } from "../middlewares/validar-campos.js";
 import { check } from "express-validator";
-import { crearMultipago, crearPago, eliminarPago, getPagosbyCuotaId, getPagosById, getPagosbyUserId } from "../controllers/pagosController.js";
+import { crearMultipago, crearPago, eliminarPago, getPagos, getPagosbyCuotaId, getPagosById, getPagosbyUserId } from "../controllers/pagosController.js";
 const route = Router();
 route.use(validarJWT);
 
+route.get('/', getPagos);
 route.get('/user/:user_id', getPagosbyUserId);
 route.get('/cuota/:cuota_id', getPagosbyCuotaId);
 route.get('/:id', getPagosById);
