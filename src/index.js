@@ -52,6 +52,25 @@ app.use((req, res, next) => {
         msg: "Ruta no encontrada",
     });
 });
+
+// Middleware global de manejo de errores (captura throws síncronos y next(err))
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    console.error('Error no controlado en request:', err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({
+        ok: false,
+        msg: "Error interno del servidor",
+    });
+});
+
+// Red de seguridad a nivel de proceso: registrar en vez de tumbar el servidor
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
 app.listen(PORT, async () => {
     console.log(`Servicio levantado en el puerto: ${PORT}`);
 

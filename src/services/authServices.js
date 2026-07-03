@@ -54,9 +54,11 @@ export const registrarEmpresaUsuarioService = async (data) => {
                 estadoEmpresaPlanes.activo,
             ]);
             const token = await generarJWT(usuarioResult.rows[0].id, userNombre, idEmpresa, userRol.admin, fechaFin, planPruebaId);
+            // No exponer el hash de la contraseña en la respuesta
+            const { password: _password, ...usuarioSinPassword } = usuarioResult.rows[0];
             return {
                 empresa: { id: idEmpresa, nombre },
-                usuario: { ...usuarioResult.rows[0], planPruebaId },
+                usuario: { ...usuarioSinPassword, planPruebaId },
                 token
             };
         });
@@ -92,7 +94,9 @@ export const loginService = async (data) => {
             throw new Error(userError.inactiveUser);
         }
         const token = await generarJWT(usuario.id, usuario.nombre, usuario.empresa_id, usuario.rol, usuario.fecha_fin, usuario.plan_id);
-        return { ...usuario, token };
+        // No exponer el hash de la contraseña en la respuesta
+        const { password: _password, ...usuarioSinPassword } = usuario;
+        return { ...usuarioSinPassword, token };
 
     } catch (error) {
         throw error; // Propagar errores conocidos

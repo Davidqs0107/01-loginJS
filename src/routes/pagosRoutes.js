@@ -18,8 +18,8 @@ route.post('/', [
 ], crearPago);
 
 route.post('/multiple', [
-    check('cuota_id', 'El campo cuota_id es obligatorio').not().isEmpty(),
-    check('montoTotal', 'El campo monto es obligatorio').not().isEmpty(),
+    check('prestamo_id', 'El campo prestamo_id es obligatorio').not().isEmpty(),
+    check('montoTotal', 'El campo montoTotal es obligatorio').not().isEmpty(),
     check('fecha_pago', 'El campo fecha_pago es obligatorio').not().isEmpty(),
     validarCampos
 ], crearMultipago);

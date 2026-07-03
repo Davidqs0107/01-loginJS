@@ -133,19 +133,19 @@ export const crearPrestamoService = async (data) => {
                 fechaInicio: fechaInicioUTC,
             });
 
-            // Insertar múltiples cuotas en una sola consulta
-            const cuotasValues = cuotas
-                .map(
-                    (cuota, index) =>
-                        `(${idPrestamo}, ${index + 1}, '${cuota.fechaPago}', ${cuota.monto}, 'pendiente')`
-                )
-                .join(", ");
+            // Insertar múltiples cuotas en una sola consulta (parametrizada)
+            const cuotasParams = [];
+            const cuotasPlaceholders = cuotas.map((cuota, index) => {
+                const base = index * 4;
+                cuotasParams.push(idPrestamo, index + 1, cuota.fechaPago, cuota.monto);
+                return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, 'pendiente')`;
+            });
 
             const cuotasQuery = `
                     INSERT INTO cuotas (prestamo_id, numero_cuota, fecha_pago, monto, estado)
-                    VALUES ${cuotasValues} RETURNING *`;
+                    VALUES ${cuotasPlaceholders.join(", ")} RETURNING *`;
 
-            const cuotasResult = await client.query(cuotasQuery);
+            const cuotasResult = await client.query(cuotasQuery, cuotasParams);
 
             return { prestamo: prestamoResult.rows, cuotas: cuotasResult.rows };
         });
@@ -263,21 +263,42 @@ export const completarPrestamoService = async (id) => {
     }
 };
 
-const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {
+/**
+ * Calcula la fecha de vencimiento de la cuota `numeroCuota` a partir de la fecha
+ * de inicio, respetando la unidad y el múltiplo correcto de cada frecuencia.
+ * Centraliza la lógica para que interés fijo y cuota constante coincidan.
+ */
+export const calcularFechaCuota = (fechaInicio, numeroCuota, frecuenciaPago) => {
+    let cantidad;
+    let unidad;
+    switch (frecuenciaPago) {
+        case frecuenciaPagoEnum.diario:
+            cantidad = numeroCuota; unidad = "days"; break;
+        case frecuenciaPagoEnum.semanal:
+            cantidad = numeroCuota; unidad = "weeks"; break;
+        case frecuenciaPagoEnum.quincenal:
+            cantidad = numeroCuota * 15; unidad = "days"; break;
+        case frecuenciaPagoEnum.mensual:
+            cantidad = numeroCuota; unidad = "months"; break;
+        case frecuenciaPagoEnum.trimestral:
+            cantidad = numeroCuota * 3; unidad = "months"; break;
+        case frecuenciaPagoEnum.semestral:
+            cantidad = numeroCuota * 6; unidad = "months"; break;
+        case frecuenciaPagoEnum.anual:
+            cantidad = numeroCuota; unidad = "years"; break;
+        default:
+            throw new Error("Frecuencia de pago no válida");
+    }
+    return moment.utc(fechaInicio).add(cantidad, unidad).format("YYYY-MM-DD");
+};
+
+export const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {
     const cuotas = [];
     const montoInt = parseFloat(monto);
     const montoInteres = parseFloat((montoInt * (tasaInteres / 100)).toFixed(2)); // Interés fijo por periodo
-    const frecuenciaUnidad =
-        frecuenciaPago === frecuenciaPagoEnum.quincenal ? "days" : // Quincenal en días
-            frecuenciaPago === frecuenciaPagoEnum.diario ? "days" :
-                frecuenciaPago === frecuenciaPagoEnum.semanal ? "weeks" :
-                    frecuenciaPago === frecuenciaPagoEnum.anual ? "years" : "months";
 
     for (let i = 1; i <= totalCuotas; i++) {
-        const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 15 : i; // Quincenal: 15 días por cuota
-        const fechaPago = moment.utc(fechaInicio)
-            .add(cantidad, frecuenciaUnidad)
-            .format("YYYY-MM-DD");
+        const fechaPago = calcularFechaCuota(fechaInicio, i, frecuenciaPago);
 
         if (i < totalCuotas) {
             // Cuotas intermedias: Solo interés
@@ -291,7 +312,7 @@ const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuencia
             cuotas.push({
                 numeroCuota: i,
                 fechaPago,
-                monto: parseFloat((montoInteres + montoInt)).toFixed(2),
+                monto: parseFloat((montoInteres + montoInt).toFixed(2)),
             });
         }
     }
@@ -299,48 +320,30 @@ const calcularCuotasInteresFijo = ({ monto, tasaInteres, totalCuotas, frecuencia
     return cuotas;
 };
 
-const calcularCuotas = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {
+export const calcularCuotas = ({ monto, tasaInteres, totalCuotas, frecuenciaPago, fechaInicio }) => {
     const cuotas = [];
     const montoInt = parseFloat(monto);
     const montoTotal = montoInt * (1 + tasaInteres / 100); // Monto total incluyendo interés
     const montoCuota = parseFloat((montoTotal / totalCuotas).toFixed(2)); // Redondear a 2 decimales
 
-    let frecuenciaUnidad;
-    switch (frecuenciaPago) {
-        case frecuenciaPagoEnum.diario:
-            frecuenciaUnidad = "days";
-            break;
-        case frecuenciaPagoEnum.semanal:
-            frecuenciaUnidad = "weeks";
-            break;
-        case frecuenciaPagoEnum.quincenal:
-            frecuenciaUnidad = "days";
-            break;
-        case frecuenciaPagoEnum.mensual:
-            frecuenciaUnidad = "months";
-            break;
-        case frecuenciaPagoEnum.trimestral:
-            frecuenciaUnidad = "months";
-            break;
-        case frecuenciaPagoEnum.semestral:
-            frecuenciaUnidad = "months";
-            break;
-        case frecuenciaPagoEnum.anual:
-            frecuenciaUnidad = "years";
-            break;
-        default:
-            throw new Error("Frecuencia de pago no válida");
-    }
-
+    let acumulado = 0;
     for (let i = 1; i <= totalCuotas; i++) {
-        const cantidad = frecuenciaPago === frecuenciaPagoEnum.quincenal ? i * 15 : i; // Quincenal: 15 días por cuota
-        const fechaPago = moment.utc(fechaInicio)
-            .add(cantidad, frecuenciaUnidad)
-            .format("YYYY-MM-DD");
+        const fechaPago = calcularFechaCuota(fechaInicio, i, frecuenciaPago);
+
+        // La última cuota absorbe el residuo del redondeo para que
+        // la suma de cuotas cuadre exactamente con el monto total.
+        let montoActual;
+        if (i < totalCuotas) {
+            montoActual = montoCuota;
+            acumulado += montoCuota;
+        } else {
+            montoActual = parseFloat((montoTotal - acumulado).toFixed(2));
+        }
+
         cuotas.push({
             numeroCuota: i,
             fechaPago,
-            monto: montoCuota,
+            monto: montoActual,
         });
     }
 

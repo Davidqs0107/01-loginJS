@@ -74,7 +74,7 @@ export const crearPago = async (req, res) => {
 export const crearMultipago = async (req, res) => {
     // 1. Recoger datos y agregar IDs desde el middleware
     const data = req.body;
-    // data.empresa_id = req.empresa_id; // Si fuera necesario para el contexto, aunque no se usa en el servicio
+    data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware (aísla el multipago por tenant)
     data.usuario_id = req.id; // ID del usuario que registra el pago (desde el middleware)
 
     // Se asume que el body contiene: { prestamo_id, montoTotal, fecha_pago, tipo_pago }

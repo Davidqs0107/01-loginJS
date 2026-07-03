@@ -37,10 +37,17 @@ export const login = async (req, res = response) => {
 
 export const registerEmpresaUsuario = async (req, res) => {
     const { empresa, nombre: userNombre, email, password } = req.body; // Datos enviados desde el cliente
-    const { nombre } = empresa;
-    const emailLowerCase = email.toLowerCase();
     try {
-        const { empresa, usuario, token } = await registrarEmpresaUsuarioService({ nombre, email: emailLowerCase, password, userNombre });
+        // Validar la presencia del nombre de la empresa (no lo cubre express-validator)
+        if (!empresa || !empresa.nombre) {
+            return res.status(400).json({
+                ok: false,
+                msg: "El nombre de la empresa es obligatorio",
+            });
+        }
+        const nombre = empresa.nombre;
+        const emailLowerCase = email.toLowerCase();
+        const { usuario, token } = await registrarEmpresaUsuarioService({ nombre, email: emailLowerCase, password, userNombre });
 
         res.status(201).json({
             ok: true,
