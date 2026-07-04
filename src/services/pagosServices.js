@@ -1,6 +1,9 @@
 import { notFoundError } from "../constants/notfound.constants.js";
 import { executeSelect, executeSelectOne } from "../helpers/queryS.js";
 import { executeTransaction } from "../helpers/transactionSql.js";
+import { registrarAuditoria } from "./auditoriaService.js";
+import { getConfiguracionService } from "./configuracionService.js";
+import { calcularAplicacionPago } from "../helpers/pagoWaterfall.js";
 
 /**
  * Recalcula y persiste el estado_prestamo en función de sus cuotas, dentro de
@@ -95,9 +98,12 @@ export const crearPagoService = async (data) => {
 
     try {
         const res = await executeTransaction(async (client) => {
-            // Verificar el estado actual de la cuota, validando que pertenezca a la empresa
+            // Verificar el estado actual de la cuota, validando que pertenezca a la empresa.
+            // Incluye fecha de vencimiento y mora ya cobrada para el cálculo del waterfall.
             const verificarCuotaQuery = `
-                SELECT cu.monto, cu.monto_pagado, cu.estado, cu.prestamo_id
+                SELECT cu.monto, cu.monto_pagado, cu.estado, cu.prestamo_id,
+                       GREATEST(CURRENT_DATE - cu.fecha_pago, 0)::int AS dias_atraso,
+                       (SELECT COALESCE(SUM(pg.monto_mora), 0) FROM pagos pg WHERE pg.cuota_id = cu.id) AS mora_cobrada
                 FROM cuotas cu
                 JOIN prestamos p ON cu.prestamo_id = p.id
                 WHERE cu.id = $1 AND p.empresa_id = $2`;
@@ -107,24 +113,37 @@ export const crearPagoService = async (data) => {
                 throw new Error("No se encontro la cuota especificada.");
             }
 
-            const { monto: montoCuota, monto_pagado: montoPagadoActual, prestamo_id: prestamoId } = cuota.rows[0];
+            const {
+                monto: montoCuota, monto_pagado: montoPagadoActual, prestamo_id: prestamoId,
+                dias_atraso: diasAtraso, mora_cobrada: moraCobrada,
+            } = cuota.rows[0];
             const restante = montoCuota - montoPagadoActual;
 
             if (restante <= 0) {
                 throw new Error("La cuota ya esta completamente pagada.");
             }
 
-            // Determinar cuánto del pago se aplicará a la cuota
-            const montoAplicado = Math.min(montoPago, restante);
+            // Distribuir el pago: primero mora, luego el saldo de la cuota (waterfall).
+            // Si la mora está inactiva, moraAplicada = 0 y el comportamiento es el histórico.
+            const config = await getConfiguracionService(empresa_id);
+            const { moraAplicada, montoAplicado, excedente } = calcularAplicacionPago({
+                montoPago,
+                restanteCuota: restante,
+                montoCuota,
+                diasAtraso,
+                moraCobrada,
+                config,
+            });
+
             const nuevoMontoPagado = parseFloat(montoPagadoActual) + montoAplicado;
             const nuevoEstado = nuevoMontoPagado >= montoCuota ? "pagada" : "parcial";
 
-            // Insertar el pago en la tabla pagos
+            // Insertar el pago (monto = a cuota, monto_mora = a mora)
             const insertarPagoQuery = `
-                INSERT INTO pagos (cuota_id, usuario_id, monto,tipo_pago, fecha_pago)
-                VALUES ($1, $2, $3, $4,$5)
+                INSERT INTO pagos (cuota_id, usuario_id, monto, monto_mora, tipo_pago, fecha_pago)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING id`;
-            const pagoResult = await client.query(insertarPagoQuery, [cuota_id, usuario_id, montoAplicado, tipo_pago, fecha_pago]);
+            const pagoResult = await client.query(insertarPagoQuery, [cuota_id, usuario_id, montoAplicado, moraAplicada, tipo_pago, fecha_pago]);
 
             // Actualizar la cuota con el monto pagado y el nuevo estado
             const actualizarCuotaQuery = `
@@ -142,11 +161,17 @@ export const crearPagoService = async (data) => {
             // Recalcular el estado del préstamo (pendiente/activo/completado)
             await recalcularEstadoPrestamo(client, prestamoId);
 
+            const mensajes = [];
+            if (moraAplicada > 0) mensajes.push(`Se aplicaron ${moraAplicada} a mora.`);
+            if (excedente > 0) mensajes.push(`El excedente es ${excedente}.`);
+
             return {
                 pagoId: pagoResult.rows[0].id,
                 cuotaActualizada: cuotaResult.rows[0],
-                mensajeExcedente: montoPago > restante ? `El monto del pago excedió el requerido. Se aplicaron ${montoAplicado} y el excedente es ${montoPago - restante}.` : null,
+                mensajeExcedente: mensajes.length > 0 ? mensajes.join(' ') : null,
                 montoAplicado: montoAplicado,
+                moraAplicada: moraAplicada,
+                excedente: excedente,
             };
         });
 
@@ -154,7 +179,9 @@ export const crearPagoService = async (data) => {
             pagoId: res.pagoId,
             cuotaActualizada: res.cuotaActualizada,
             mensajeExcedente: res.mensajeExcedente,
-            montoAplicado: res.montoAplicado
+            montoAplicado: res.montoAplicado,
+            moraAplicada: res.moraAplicada,
+            excedente: res.excedente,
         };
     } catch (error) {
         throw error;
@@ -186,7 +213,9 @@ export const crearMultipagoService = async (data) => {
             // 1. Obtener todas las cuotas pendientes o parciales del préstamo,
             //    validando que el préstamo pertenezca a la empresa. Ordenadas por número de cuota.
             const obtenerCuotasQuery = `
-                SELECT cu.id, cu.monto, cu.monto_pagado, cu.estado, cu.numero_cuota
+                SELECT cu.id, cu.monto, cu.monto_pagado, cu.estado, cu.numero_cuota,
+                       GREATEST(CURRENT_DATE - cu.fecha_pago, 0)::int AS dias_atraso,
+                       (SELECT COALESCE(SUM(pg.monto_mora), 0) FROM pagos pg WHERE pg.cuota_id = cu.id) AS mora_cobrada
                 FROM cuotas cu
                 JOIN prestamos p ON cu.prestamo_id = p.id
                 WHERE cu.prestamo_id = $1 AND p.empresa_id = $2 AND cu.estado IN ('pendiente', 'parcial')
@@ -204,8 +233,10 @@ export const crearMultipagoService = async (data) => {
             }
 
             const cuotas = cuotasResult.rows;
+            const config = await getConfiguracionService(empresa_id);
 
             // 2. Iterar sobre las cuotas y aplicar el pago hasta agotar el monto total.
+            //    Por cada cuota se aplica el waterfall: primero mora, luego el saldo.
             for (const cuota of cuotas) {
                 if (montoPendiente <= 0) {
                     break; // Se agotó el monto de pago
@@ -217,17 +248,29 @@ export const crearMultipagoService = async (data) => {
                     continue; // Cuota ya pagada (aunque la consulta inicial intenta evitar esto, es una doble verificación)
                 }
 
-                // Determinar cuánto del pago se aplicará a esta cuota
-                const montoAplicado = Math.min(montoPendiente, restanteCuota);
+                const { moraAplicada, montoAplicado } = calcularAplicacionPago({
+                    montoPago: montoPendiente,
+                    restanteCuota,
+                    montoCuota: cuota.monto,
+                    diasAtraso: cuota.dias_atraso,
+                    moraCobrada: cuota.mora_cobrada,
+                    config,
+                });
+
+                const consumido = moraAplicada + montoAplicado;
+                if (consumido <= 0) {
+                    continue; // Nada que aplicar a esta cuota con el monto restante
+                }
+
                 const nuevoMontoPagado = parseFloat(cuota.monto_pagado) + montoAplicado;
                 const nuevoEstado = nuevoMontoPagado >= parseFloat(cuota.monto) ? "pagada" : "parcial";
 
-                // 3. Insertar el pago en la tabla 'pagos'
+                // 3. Insertar el pago en la tabla 'pagos' (monto a cuota + monto_mora a mora)
                 const insertarPagoQuery = `
-                    INSERT INTO pagos (cuota_id, usuario_id, monto, tipo_pago, fecha_pago)
-                    VALUES ($1, $2, $3, $4, $5)
+                    INSERT INTO pagos (cuota_id, usuario_id, monto, monto_mora, tipo_pago, fecha_pago)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     RETURNING id`;
-                const pagoResult = await client.query(insertarPagoQuery, [cuota.id, usuario_id, montoAplicado, tipo_pago, fecha_pago]);
+                const pagoResult = await client.query(insertarPagoQuery, [cuota.id, usuario_id, montoAplicado, moraAplicada, tipo_pago, fecha_pago]);
 
                 // 4. Actualizar la cuota
                 const actualizarCuotaQuery = `
@@ -242,10 +285,11 @@ export const crearMultipagoService = async (data) => {
                     pagoId: pagoResult.rows[0].id,
                     cuota: cuotaResult.rows[0],
                     montoAplicado: montoAplicado,
+                    moraAplicada: moraAplicada,
                     estadoAnterior: cuota.estado,
                 });
 
-                montoPendiente -= montoAplicado;
+                montoPendiente -= consumido;
             }
 
             // Recalcular el estado del préstamo tras aplicar el multipago
@@ -271,12 +315,12 @@ export const crearMultipagoService = async (data) => {
         throw error;
     }
 };
-export const eliminarPagoService = async (pagoId, empresa_id) => {
+export const eliminarPagoService = async (pagoId, empresa_id, actor = {}) => {
     try {
         await executeTransaction(async (client) => {
             // Obtener información del pago antes de eliminarlo, validando la empresa
             const obtenerPagoQuery = `
-                SELECT pg.cuota_id, pg.monto, cu.prestamo_id
+                SELECT pg.id, pg.cuota_id, pg.usuario_id, pg.monto, pg.tipo_pago, pg.fecha_pago, cu.prestamo_id
                 FROM pagos pg
                 JOIN cuotas cu ON pg.cuota_id = cu.id
                 JOIN prestamos p ON cu.prestamo_id = p.id
@@ -287,7 +331,8 @@ export const eliminarPagoService = async (pagoId, empresa_id) => {
                 throw new Error(notFoundError.pagoNotFound);
             }
 
-            const { cuota_id, monto, prestamo_id: prestamoId } = pagoResult.rows[0];
+            const pagoEliminado = pagoResult.rows[0];
+            const { cuota_id, monto, prestamo_id: prestamoId } = pagoEliminado;
 
             // Eliminar el pago de la tabla `pagos`
             const eliminarPagoQuery = `
@@ -316,6 +361,18 @@ export const eliminarPagoService = async (pagoId, empresa_id) => {
 
             // Recalcular el estado del préstamo (puede volver de 'completado' a 'activo')
             await recalcularEstadoPrestamo(client, prestamoId);
+
+            // Registrar en la bitácora de auditoría (misma transacción)
+            await registrarAuditoria({
+                client,
+                empresa_id,
+                usuario_id: actor.usuario_id ?? null,
+                accion: 'eliminar_pago',
+                entidad: 'pago',
+                entidad_id: pagoId,
+                datos_antes: pagoEliminado,
+                ip: actor.ip ?? null,
+            });
 
             return {
                 success: true,

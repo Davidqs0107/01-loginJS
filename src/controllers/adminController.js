@@ -1,6 +1,18 @@
 import { estadoEmpresaPlanes } from "../constants/empresa_planes.constanst.js";
 import { getEmpresaByNameService, getEmpresasService, getPlanesService, getUsuariosByEmpresaService, limpiarDatosEmpresaService, updateEmpresaPlanService, updatePlanMaxUsuariosService } from "../services/adminService.js";
+import { getSuscripcionesService } from "../services/suscripcionService.js";
 import { formatDateWithDateFns } from "../helpers/functions.js"
+
+export const getSuscripciones = async (req, res) => {
+    const { estado, page = 1, pageSize = 30 } = req.query; // estado opcional: vigente | por_vencer | vencido
+    try {
+        const { data, meta } = await getSuscripcionesService({ estado, page, pageSize });
+        res.status(200).json({ ok: true, suscripciones: data, meta });
+    } catch (error) {
+        console.error('Error en getSuscripciones:', error);
+        res.status(500).json({ ok: false, msg: 'Error al obtener las suscripciones.' });
+    }
+};
 export const getEmpresas = async (req, res = response) => {
     const dateNow = formatDateWithDateFns(new Date());
     const { page = 1, pageSize = 10, fecha_inicio = dateNow, fecha_fin = dateNow } = req.query;

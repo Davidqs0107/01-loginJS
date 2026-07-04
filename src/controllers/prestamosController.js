@@ -1,8 +1,27 @@
 import { response } from "express";
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearPrestamoService, completarPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
+import { crearPrestamoService, completarPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, refinanciarPrestamoService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
 import { estadoPrestamo } from "../constants/commons.constans.js";
 import { formatDateWithDateFns } from "../helpers/functions.js";
+
+export const refinanciarPrestamo = async (req, res) => {
+    const { id } = req.params;
+    const empresa_id = req.empresa_id;
+    const usuario_id = req.id;
+    const { monto_adicional, total_cuotas, fecha_inicio, tasa_interes, frecuencia_pago, tipo_prestamo } = req.body;
+    try {
+        const result = await refinanciarPrestamoService({
+            prestamo_id: id, empresa_id, usuario_id,
+            monto_adicional, total_cuotas, fecha_inicio, tasa_interes, frecuencia_pago, tipo_prestamo,
+            actor: { ip: req.ip },
+        });
+        return res.status(201).json({ ok: true, msg: 'Préstamo refinanciado', ...result });
+    } catch ({ message }) {
+        console.error('Error en refinanciarPrestamo:', message);
+        const status = message === notFoundError.prestamoNotFound ? 404 : 400;
+        return res.status(status).json({ ok: false, msg: message });
+    }
+}
 
 export const getPrestamos = async (req, res) => {
     const fecha = formatDateWithDateFns(new Date());

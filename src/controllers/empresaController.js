@@ -1,5 +1,16 @@
 import { response } from 'express';
 import { getEmpresaByIdService, getSummaryCobradorService, getSummaryService, updateEmpresaService } from '../services/empresaServices.js';
+import { getSuscripcionEstadoService } from '../services/suscripcionService.js';
+
+export const getSuscripcion = async (req, res = response) => {
+    try {
+        const suscripcion = await getSuscripcionEstadoService(req.empresa_id);
+        res.status(200).json({ ok: true, suscripcion });
+    } catch (error) {
+        console.error('Error en getSuscripcion:', error);
+        res.status(500).json({ ok: false, msg: 'Error al obtener la suscripción.' });
+    }
+};
 
 export const getEmpresaById = async (req, res = response) => {
     const empresaId = req.empresa_id;

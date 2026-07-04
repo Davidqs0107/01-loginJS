@@ -4,6 +4,7 @@ import { buildDynamicQuery, buildQueryUpdate } from "../helpers/buildDynamicQuer
 import { executeInsert, executeQuery, executeSelect, executeSelectOne } from "../helpers/queryS.js";
 import { sanitizeFileName } from "../helpers/sanityFileName.js";
 import { executeTransaction } from "../helpers/transactionSql.js";
+import { registrarAuditoria } from "./auditoriaService.js";
 import fs from 'fs/promises';
 import moment from "moment";
 
@@ -109,51 +110,160 @@ export const getPrestamosByClientIdServices = async (data) => {
     }
 }
 
+/**
+ * Inserta un préstamo y sus cuotas usando un `client` de transacción existente.
+ * Extraído para poder reutilizarlo (creación normal y refinanciación) dentro de
+ * una única transacción.
+ */
+const insertarPrestamoConCuotas = async (client, data) => {
+    const {
+        cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago,
+        total_cuotas, fecha_inicio, tipo_prestamo, documento = null, prestamo_padre_id = null,
+    } = data;
+
+    const fechaInicioUTC = moment.utc(fecha_inicio).format("YYYY-MM-DD");
+
+    const query = `
+        INSERT INTO prestamos (cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo, documento, prestamo_padre_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *`;
+    const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fechaInicioUTC, tipo_prestamo, documento, prestamo_padre_id]);
+    const idPrestamo = prestamoResult.rows[0].id;
+
+    const calcularCuotasFn =
+        tipo_prestamo === tipoPrestamoInteresEnum.fijo ? calcularCuotasInteresFijo : calcularCuotas;
+    const cuotas = calcularCuotasFn({
+        monto,
+        tasaInteres: tasa_interes,
+        totalCuotas: total_cuotas,
+        frecuenciaPago: frecuencia_pago,
+        fechaInicio: fechaInicioUTC,
+    });
+
+    // Insertar múltiples cuotas en una sola consulta (parametrizada)
+    const cuotasParams = [];
+    const cuotasPlaceholders = cuotas.map((cuota, index) => {
+        const base = index * 4;
+        cuotasParams.push(idPrestamo, index + 1, cuota.fechaPago, cuota.monto);
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, 'pendiente')`;
+    });
+
+    const cuotasQuery = `
+            INSERT INTO cuotas (prestamo_id, numero_cuota, fecha_pago, monto, estado)
+            VALUES ${cuotasPlaceholders.join(", ")} RETURNING *`;
+    const cuotasResult = await client.query(cuotasQuery, cuotasParams);
+
+    return { prestamo: prestamoResult.rows, cuotas: cuotasResult.rows };
+};
+
 export const crearPrestamoService = async (data) => {
-    const { cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo, documento } = data;
     try {
-        // Normalizar fecha_inicio a UTC para evitar problemas de zona horaria
-        const fechaInicioUTC = moment.utc(fecha_inicio).format("YYYY-MM-DD");
-
-        const prestamo = await executeTransaction(async (client) => {
-            const query = `
-                INSERT INTO prestamos (cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fecha_inicio, tipo_prestamo,documento)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10)
-                RETURNING *`;
-            const prestamoResult = await client.query(query, [cliente_id, usuario_id, empresa_id, monto, tasa_interes, frecuencia_pago, total_cuotas, fechaInicioUTC, tipo_prestamo, documento]);
-            const idPrestamo = prestamoResult.rows[0].id;
-            // Calcular las cuotas
-            const calcularCuotasFn =
-                tipo_prestamo === tipoPrestamoInteresEnum.fijo ? calcularCuotasInteresFijo : calcularCuotas;
-            const cuotas = calcularCuotasFn({
-                monto,
-                tasaInteres: tasa_interes,
-                totalCuotas: total_cuotas,
-                frecuenciaPago: frecuencia_pago,
-                fechaInicio: fechaInicioUTC,
-            });
-
-            // Insertar múltiples cuotas en una sola consulta (parametrizada)
-            const cuotasParams = [];
-            const cuotasPlaceholders = cuotas.map((cuota, index) => {
-                const base = index * 4;
-                cuotasParams.push(idPrestamo, index + 1, cuota.fechaPago, cuota.monto);
-                return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, 'pendiente')`;
-            });
-
-            const cuotasQuery = `
-                    INSERT INTO cuotas (prestamo_id, numero_cuota, fecha_pago, monto, estado)
-                    VALUES ${cuotasPlaceholders.join(", ")} RETURNING *`;
-
-            const cuotasResult = await client.query(cuotasQuery, cuotasParams);
-
-            return { prestamo: prestamoResult.rows, cuotas: cuotasResult.rows };
-        });
-        return prestamo;
+        return await executeTransaction(async (client) => insertarPrestamoConCuotas(client, data));
     } catch (error) {
         throw error;
     }
 }
+
+/**
+ * Refinancia un préstamo: salda las cuotas pendientes del préstamo original
+ * (marcándolo 'refinanciado'), capitaliza el saldo pendiente + un monto adicional
+ * opcional, y crea un préstamo nuevo enlazado al anterior. Todo en una transacción.
+ *
+ * @param {object} data
+ * @param {number} data.prestamo_id - Préstamo a refinanciar.
+ * @param {number} data.empresa_id
+ * @param {number} data.usuario_id
+ * @param {number} [data.monto_adicional] - Dinero nuevo entregado al cliente (default 0).
+ * @param {number} data.total_cuotas - Cuotas del nuevo préstamo.
+ * @param {string} data.fecha_inicio - Fecha de inicio del nuevo préstamo.
+ * @param {number} [data.tasa_interes] - Si se omite, se hereda del préstamo original.
+ * @param {string} [data.frecuencia_pago] - Si se omite, se hereda.
+ * @param {string} [data.tipo_prestamo] - Si se omite, se hereda.
+ * @param {object} [data.actor] - { ip } para la auditoría.
+ */
+export const refinanciarPrestamoService = async (data) => {
+    const {
+        prestamo_id, empresa_id, usuario_id, monto_adicional = 0,
+        total_cuotas, fecha_inicio, tasa_interes, frecuencia_pago, tipo_prestamo, actor = {},
+    } = data;
+
+    const adicional = parseFloat(monto_adicional) || 0;
+    if (adicional < 0) throw new Error("El monto adicional no puede ser negativo.");
+    if (!total_cuotas || !fecha_inicio) throw new Error("total_cuotas y fecha_inicio son obligatorios.");
+
+    return await executeTransaction(async (client) => {
+        // 1. Cargar el préstamo original validando empresa
+        const oldRes = await client.query(
+            `SELECT * FROM prestamos WHERE id = $1 AND empresa_id = $2`,
+            [prestamo_id, empresa_id]
+        );
+        if (oldRes.rowCount === 0) throw new Error(notFoundError.prestamoNotFound);
+        const original = oldRes.rows[0];
+        if (['refinanciado', 'completado'].includes(original.estado_prestamo)) {
+            throw new Error(`No se puede refinanciar un préstamo en estado '${original.estado_prestamo}'.`);
+        }
+
+        // 2. Saldo pendiente del préstamo original
+        const saldoRes = await client.query(
+            `SELECT COALESCE(SUM(monto - monto_pagado), 0) AS saldo
+             FROM cuotas WHERE prestamo_id = $1 AND estado IN ('pendiente', 'parcial')`,
+            [prestamo_id]
+        );
+        const saldoPendiente = parseFloat(saldoRes.rows[0].saldo);
+
+        // 3. Saldar las cuotas pendientes del original (la deuda pasa al nuevo préstamo)
+        await client.query(
+            `UPDATE cuotas SET monto_pagado = monto, estado = 'pagada', updated_at = NOW()
+             WHERE prestamo_id = $1 AND estado IN ('pendiente', 'parcial')`,
+            [prestamo_id]
+        );
+
+        // 4. Marcar el original como refinanciado
+        await client.query(
+            `UPDATE prestamos SET estado_prestamo = 'refinanciado', updated_at = NOW() WHERE id = $1`,
+            [prestamo_id]
+        );
+
+        // 5. Crear el nuevo préstamo con el saldo capitalizado + adicional
+        const nuevoCapital = Math.round((saldoPendiente + adicional) * 100) / 100;
+        if (nuevoCapital <= 0) throw new Error("El capital del nuevo préstamo debe ser positivo.");
+
+        const nuevo = await insertarPrestamoConCuotas(client, {
+            cliente_id: original.cliente_id,
+            usuario_id,
+            empresa_id,
+            monto: nuevoCapital,
+            tasa_interes: tasa_interes ?? original.tasa_interes,
+            frecuencia_pago: frecuencia_pago ?? original.frecuencia_pago,
+            total_cuotas,
+            fecha_inicio,
+            tipo_prestamo: tipo_prestamo ?? original.tipo_prestamo,
+            prestamo_padre_id: prestamo_id,
+        });
+
+        // 6. Auditar
+        await registrarAuditoria({
+            client,
+            empresa_id,
+            usuario_id,
+            accion: 'refinanciar_prestamo',
+            entidad: 'prestamo',
+            entidad_id: Number(prestamo_id),
+            datos_antes: { saldo_pendiente: saldoPendiente, estado_anterior: original.estado_prestamo },
+            datos_despues: { nuevo_prestamo_id: nuevo.prestamo[0].id, nuevo_capital: nuevoCapital, monto_adicional: adicional },
+            ip: actor.ip ?? null,
+        });
+
+        return {
+            prestamo_anterior_id: Number(prestamo_id),
+            saldo_refinanciado: saldoPendiente,
+            monto_adicional: adicional,
+            nuevo_capital: nuevoCapital,
+            prestamo: nuevo.prestamo,
+            cuotas: nuevo.cuotas,
+        };
+    });
+};
 
 export const updatePrestamoService = async (id, data) => {
     const { campos, valores, placeholders } = buildDynamicQuery(data);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getEmpresaById, getSummary, getSummaryCobrador, updateEmpresa } from "../controllers/empresaController.js";
+import { getEmpresaById, getSummary, getSummaryCobrador, getSuscripcion, updateEmpresa } from "../controllers/empresaController.js";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarRol } from "../middlewares/validar-rol.js";
 import { userRol } from "../constants/usuarios.constants.js";
@@ -11,6 +11,7 @@ route.use(validarJWT);
 route.get('/', getEmpresaById);
 route.get('/summary', getSummary);
 route.get('/summary/cobrador', getSummaryCobrador);
+route.get('/suscripcion', getSuscripcion);
 
 route.put('/', [validarRol(superAdmin, admin)], updateEmpresa);
 export default route;

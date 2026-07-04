@@ -129,8 +129,9 @@ export const crearMultipago = async (req, res) => {
 export const eliminarPago = async (req, res) => {
     const { id } = req.params;
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
+    const actor = { usuario_id: req.id, ip: req.ip };
     try {
-        const result = await eliminarPagoService(id, empresa_id);
+        const result = await eliminarPagoService(id, empresa_id, actor);
         return res.status(200).json({
             ok: true,
             message: result,

@@ -11,6 +11,11 @@ import pagosRouter from './routes/pagosRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import descargoRouter from './routes/descargoRoutes.js';
 import reportesRouter from './routes/reportesRoutes.js';
+import configuracionRouter from './routes/configuracionRoutes.js';
+import auditoriaRouter from './routes/auditoriaRoutes.js';
+import arqueoRouter from './routes/arqueoRoutes.js';
+import portalRouter from './routes/portalRoutes.js';
+import comprobanteRouter from './routes/comprobanteRoutes.js';
 import fileUpload from 'express-fileupload';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,8 +24,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Importar job de notificaciones
+// Importar jobs
 import notificacionesCuotasJob from './jobs/notificacionesCuotasJob.js';
+import incumplimientoJob from './jobs/incumplimientoJob.js';
+import suscripcionJob from './jobs/suscripcionJob.js';
 import { verificarConfiguracion } from './services/emailService.js';
 
 const app = express();
@@ -45,6 +52,11 @@ app.use('/api/cuotas', cuotasRouter);
 app.use('/api/pagos', pagosRouter);
 app.use('/api/descargos', descargoRouter);
 app.use('/api/reportes', reportesRouter);
+app.use('/api/configuracion', configuracionRouter);
+app.use('/api/auditoria', auditoriaRouter);
+app.use('/api/arqueos', arqueoRouter);
+app.use('/api/portal', portalRouter);
+app.use('/api/comprobantes', comprobanteRouter);
 //middleware para rutas no encontradas
 app.use((req, res, next) => {
     res.status(404).json({
@@ -73,6 +85,10 @@ process.on('uncaughtException', (error) => {
 });
 app.listen(PORT, async () => {
     console.log(`Servicio levantado en el puerto: ${PORT}`);
+
+    // Jobs que no dependen del email
+    incumplimientoJob.iniciar();
+    suscripcionJob.iniciar();
 
     // Verificar configuración de email
     console.log('\n📧 Verificando configuración de email...');

@@ -1,5 +1,41 @@
 import { notFoundError } from "../constants/notfound.constants.js";
 import { crearClienteService, getClienteByIdService, getClientesServices, searchClientesService, sofDeleteClientesService, updateClientesService } from "../services/clientesServices.js";
+import { getScoreClienteService } from "../services/scoreService.js";
+import { generarTokenPortalService, revocarTokenPortalService } from "../services/portalService.js";
+
+export const generarTokenPortal = async (req, res) => {
+    const { id } = req.params;
+    const empresa_id = req.empresa_id;
+    try {
+        const token = await generarTokenPortalService(id, empresa_id);
+        return res.status(200).json({ ok: true, portal_token: token, ruta: `/portal/${token}` });
+    } catch ({ message }) {
+        return res.status(400).json({ ok: false, msg: message });
+    }
+};
+
+export const revocarTokenPortal = async (req, res) => {
+    const { id } = req.params;
+    const empresa_id = req.empresa_id;
+    try {
+        await revocarTokenPortalService(id, empresa_id);
+        return res.status(200).json({ ok: true, msg: 'Acceso al portal revocado.' });
+    } catch ({ message }) {
+        return res.status(400).json({ ok: false, msg: message });
+    }
+};
+
+export const getScoreCliente = async (req, res) => {
+    const { id } = req.params;
+    const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
+    try {
+        const score = await getScoreClienteService(id, empresa_id);
+        return res.status(200).json({ ok: true, score });
+    } catch (error) {
+        console.error('Error en getScoreCliente:', error);
+        res.status(500).json({ ok: false, msg: 'Error al obtener el score del cliente.' });
+    }
+}
 
 export const getClientes = async (req, res) => {
     const { page = 1, pageSize = 10 } = req.query;

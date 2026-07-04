@@ -1,4 +1,6 @@
 import { executeSelect, executeQuery, executeSelectOne } from '../helpers/queryS.js';
+import { getConfiguracionService } from './configuracionService.js';
+import { calcularMora } from '../helpers/mora.js';
 
 // ─────────────────────────────────────────
 // ALTA PRIORIDAD
@@ -60,7 +62,31 @@ export const getReporteMoraService = async ({
         ORDER BY dias_mora DESC, c.apellido ASC
     `;
 
-    return await executeSelect(query, params, parseInt(page), parseInt(pageSize));
+    const resultado = await executeSelect(query, params, parseInt(page), parseInt(pageSize));
+
+    // Enriquecer cada fila con el recargo por mora según la configuración de la empresa
+    const config = await getConfiguracionService(empresa_id);
+    resultado.data = resultado.data.map((row) => {
+        const recargo = calcularMora({
+            saldoPendiente: row.saldo_pendiente,
+            montoCuota: row.monto_cuota,
+            diasAtraso: row.dias_mora,
+            config,
+        });
+        return {
+            ...row,
+            recargo_mora: recargo,
+            total_con_mora: Math.round((parseFloat(row.saldo_pendiente) + recargo) * 100) / 100,
+        };
+    });
+    resultado.mora_config = {
+        activa: config.mora_activa,
+        tipo: config.mora_tipo,
+        valor: config.mora_valor,
+        dias_gracia: config.mora_dias_gracia,
+    };
+
+    return resultado;
 };
 
 /**
