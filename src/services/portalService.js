@@ -97,33 +97,75 @@ export const getPortalResumenService = async (token) => {
 /**
  * El cliente sube un comprobante de pago desde el portal. Queda 'pendiente'
  * hasta que el staff lo valide. Valida que la cuota/préstamo sean del cliente.
+ *
+ * Parámetros:
+ *  - token              string  (requerido) token del portal.
+ *  - cuota_id           number  (obligatorio) cuota a la que aplica el pago.
+ *  - prestamo_id        number  (opcional)   se deriva de la cuota si falta.
+ *  - monto              number  (requerido)  monto positivo.
+ *  - referencia         string  (opcional)   nro de transacción / nota.
+ *  - archivo            string  (opcional)   ruta del archivo adjunto.
+ *  - request_id         string  (opcional)   id generado por el cliente para
+ *                                              dedupe (idempotencia).
+ *
+ * Idempotencia:
+ *  - Si llega `request_id`, se busca un comprobante previo con el mismo
+ *    (cliente_id, request_id) y se devuelve ese (no se duplica).
+ *  - Si no llega, red de seguridad: si en los últimos 5 minutos hay un
+ *    comprobante del mismo cliente, misma cuota, mismo monto y misma
+ *    referencia, se devuelve ese.
  */
-export const crearComprobanteService = async (token, { cuota_id, prestamo_id, monto, referencia, archivo }) => {
+export const crearComprobanteService = async (token, { cuota_id, prestamo_id, monto, referencia, archivo, request_id }) => {
     const cliente = await clientePorToken(token);
     if (!cliente) throw new Error('Acceso no válido.');
+
+    if (cuota_id === undefined || cuota_id === null || cuota_id === '') {
+        throw new Error('Debes indicar la cuota a la que aplica el comprobante.');
+    }
 
     const montoNum = parseFloat(monto);
     if (isNaN(montoNum) || montoNum <= 0) throw new Error('El monto debe ser un número positivo.');
 
-    let prestamoId = prestamo_id || null;
-
-    // Si se indica una cuota, validar que pertenezca a un préstamo del cliente y derivar el préstamo
-    if (cuota_id) {
-        const val = await executeQuery(
-            `SELECT p.id AS prestamo_id FROM cuotas cu
-             JOIN prestamos p ON cu.prestamo_id = p.id
-             WHERE cu.id = $1 AND p.cliente_id = $2 AND p.empresa_id = $3`,
-            [cuota_id, cliente.id, cliente.empresa_id]
+    // 1) Idempotencia estricta por request_id
+    if (request_id) {
+        const existing = await executeQuery(
+            `SELECT * FROM comprobantes_pago
+             WHERE cliente_id = $1 AND request_id = $2
+             LIMIT 1`,
+            [cliente.id, request_id]
         );
-        if (val.length === 0) throw new Error('La cuota no corresponde a este cliente.');
-        prestamoId = val[0].prestamo_id;
+        if (existing.length > 0) return existing[0];
+    } else {
+        // 2) Heurística 5 min: mismo cliente + cuota + monto + referencia
+        const recent = await executeQuery(
+            `SELECT * FROM comprobantes_pago
+             WHERE cliente_id = $1
+               AND cuota_id = $2
+               AND monto = $3
+               AND COALESCE(referencia, '') = COALESCE($4, '')
+               AND created_at > NOW() - INTERVAL '5 minutes'
+             ORDER BY created_at DESC
+             LIMIT 1`,
+            [cliente.id, cuota_id, montoNum, referencia || null]
+        );
+        if (recent.length > 0) return recent[0];
     }
 
+    // Validar que la cuota pertenezca a un préstamo del cliente y derivar el préstamo
+    const val = await executeQuery(
+        `SELECT p.id AS prestamo_id FROM cuotas cu
+         JOIN prestamos p ON cu.prestamo_id = p.id
+         WHERE cu.id = $1 AND p.cliente_id = $2 AND p.empresa_id = $3`,
+        [cuota_id, cliente.id, cliente.empresa_id]
+    );
+    if (val.length === 0) throw new Error('La cuota no corresponde a este cliente.');
+    const prestamoId = prestamo_id || val[0].prestamo_id;
+
     const rows = await executeQuery(
-        `INSERT INTO comprobantes_pago (empresa_id, cliente_id, prestamo_id, cuota_id, monto, referencia, archivo, estado)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendiente')
+        `INSERT INTO comprobantes_pago (empresa_id, cliente_id, prestamo_id, cuota_id, monto, referencia, archivo, request_id, estado)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pendiente')
          RETURNING *`,
-        [cliente.empresa_id, cliente.id, prestamoId, cuota_id || null, montoNum, referencia || null, archivo || null]
+        [cliente.empresa_id, cliente.id, prestamoId, cuota_id, montoNum, referencia || null, archivo || null, request_id || null]
     );
     return rows[0];
 };

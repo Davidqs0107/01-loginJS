@@ -15,7 +15,7 @@ export const getPortalResumen = async (req, res) => {
 /** El cliente sube un comprobante de pago (opcionalmente con archivo adjunto). */
 export const subirComprobante = async (req, res) => {
     const { token } = req.params;
-    const { cuota_id, prestamo_id, monto, referencia } = req.body;
+    const { cuota_id, prestamo_id, monto, referencia, request_id } = req.body;
 
     let archivo = null;
     try {
@@ -32,7 +32,7 @@ export const subirComprobante = async (req, res) => {
             archivo = ruta;
         }
 
-        const comprobante = await crearComprobanteService(token, { cuota_id, prestamo_id, monto, referencia, archivo });
+        const comprobante = await crearComprobanteService(token, { cuota_id, prestamo_id, monto, referencia, archivo, request_id });
         return res.status(201).json({
             ok: true,
             msg: 'Comprobante recibido. Será validado por la empresa.',

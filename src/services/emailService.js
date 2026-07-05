@@ -190,8 +190,87 @@ const enviarEmail = async (to, subject, html, text = '') => {
     }
 };
 
+/**
+ * Notifica al cliente el resultado de la validación de su comprobante del portal.
+ * @param {Object} cliente - { nombre, apellido, email }
+ * @param {Object} comprobante - { id, monto, referencia, cuota_id, ... }
+ * @param {Object} empresa - { nombre, telefono }
+ * @param {('aprobado'|'rechazado')} decision
+ * @returns {Promise<Object>} Resultado del envío (mismo shape que enviarEmail).
+ */
+const enviarResultadoComprobante = async (cliente, comprobante, empresa, decision) => {
+    const isAprobado = decision === 'aprobado';
+    const subject = isAprobado
+        ? `Tu pago fue aplicado — Comprobante #${comprobante.id}`
+        : `Tu comprobante #${comprobante.id} fue rechazado`;
+
+    const montoFmt = parseFloat(comprobante.monto).toFixed(2);
+    const empresaNombre = empresa?.nombre || 'la empresa';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>
+  body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+  .container{max-width:600px;margin:0 auto;padding:20px}
+  .header{background:${isAprobado ? '#4CAF50' : '#E53935'};color:#fff;padding:18px;text-align:center;border-radius:5px 5px 0 0}
+  .content{background:#f9f9f9;padding:24px;border:1px solid #ddd}
+  .box{background:#fff;padding:14px;margin:16px 0;border-left:4px solid ${isAprobado ? '#4CAF50' : '#E53935'}}
+  .box p{margin:6px 0}
+  .monto{font-size:20px;font-weight:bold;color:${isAprobado ? '#4CAF50' : '#E53935'}}
+  .footer{background:#f1f1f1;padding:12px;text-align:center;font-size:12px;color:#666;border-radius:0 0 5px 5px}
+</style></head>
+<body>
+  <div class="container">
+    <div class="header"><h1>${isAprobado ? 'Comprobante aprobado' : 'Comprobante rechazado'}</h1></div>
+    <div class="content">
+      <p>Hola <strong>${cliente.nombre} ${cliente.apellido || ''}</strong>,</p>
+      ${isAprobado
+        ? `<p>Hemos validado tu comprobante y registramos el pago en la cuota correspondiente.</p>
+           <div class="box">
+             <p><strong>Comprobante #${comprobante.id}</strong></p>
+             <p><strong>Monto:</strong> <span class="monto">$${montoFmt}</span></p>
+             <p><strong>Cuota aplicada:</strong> #${comprobante.cuota_id ?? '—'}</p>
+             <p><strong>Referencia:</strong> ${comprobante.referencia || '—'}</p>
+           </div>
+           <p>Gracias por tu puntualidad.</p>`
+        : `<p>Lamentablemente no pudimos validar tu comprobante. Si crees que es un error, contáctanos.</p>
+           <div class="box">
+             <p><strong>Comprobante #${comprobante.id}</strong></p>
+             <p><strong>Monto:</strong> <span class="monto">$${montoFmt}</span></p>
+             <p><strong>Referencia:</strong> ${comprobante.referencia || '—'}</p>
+           </div>
+           <p>${empresa.telefono ? `📞 ${empresa.telefono}` : ''}</p>`}
+      <p>Saludos cordiales,<br><strong>${empresaNombre}</strong></p>
+    </div>
+    <div class="footer">Este es un mensaje automático, por favor no respondas a este correo.</div>
+  </div>
+</body>
+</html>`;
+
+    const text = isAprobado
+        ? `Hola ${cliente.nombre},
+
+Tu comprobante #${comprobante.id} fue APROBADO y aplicamos el pago a la cuota #${comprobante.cuota_id ?? '—'}.
+Monto: $${montoFmt}
+Referencia: ${comprobante.referencia || '—'}
+
+Gracias por tu puntualidad.
+${empresaNombre}`
+        : `Hola ${cliente.nombre},
+
+Tu comprobante #${comprobante.id} fue RECHAZADO.
+Monto: $${montoFmt}
+Referencia: ${comprobante.referencia || '—'}
+
+Si crees que es un error, contáctanos${empresa.telefono ? ` al ${empresa.telefono}` : ''}.
+${empresaNombre}`;
+
+    return await enviarEmail(cliente.email, subject, html, text);
+};
+
 export {
     enviarRecordatorioCuota,
     verificarConfiguracion,
-    enviarEmail
+    enviarEmail,
+    enviarResultadoComprobante,
 };
