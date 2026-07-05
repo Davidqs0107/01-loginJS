@@ -38,7 +38,7 @@ app.use(cors());
 app.use(express.json());
 app.use(fileUpload({
     createParentPath: true,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 1 * 1024 * 1024 },
 }));
 app.use('/api/uploads', express.static('uploads'));
 //rutas
@@ -70,6 +70,20 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
     console.error('Error no controlado en request:', err);
     if (res.headersSent) return next(err);
+    // express-fileupload lanza esto cuando el archivo supera limits.fileSize
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({
+            ok: false,
+            msg: 'La imagen o documento es demasiado grande. Máximo 1 MB.',
+        });
+    }
+    // Otros errores de body parser (JSON malformado, body demasiado grande)
+    if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+        return res.status(413).json({
+            ok: false,
+            msg: 'La solicitud es demasiado grande.',
+        });
+    }
     res.status(500).json({
         ok: false,
         msg: "Error interno del servidor",

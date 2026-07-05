@@ -135,28 +135,32 @@ export const updatePrestamo = async (req, res) => {
 }
 
 export const uploadFile = async (req, res = response) => {
-    // Lógica para subir un archivo
     const { id } = req.params;
 
-    // Validar si hay archivos en la solicitud
     if (!req.files || !req.files.archivo) {
-        return res.status(400).json({ ok: false, error: 'No se envió ningún archivo' });
+        return res.status(400).json({ ok: false, msg: 'No se envió ningún archivo' });
     }
 
-    const archivo = req.files.archivo;
-
     try {
-        // Lógica para subir un archivo
-        const result = await uploadFileService(id, archivo);
-        return res.status(200).json({
+        const result = await uploadFileService(id, req.files.archivo);
+        return res.status(201).json({
             ok: true,
             msg: 'Archivo subido',
-            archivo: result
+            archivo: result,
         });
-
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Error interno del servidor' });
+        // express-fileupload detectó truncado antes de llegar al service
+        if (error && error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+                ok: false,
+                msg: 'La imagen o documento es demasiado grande. Máximo 1 MB.',
+            });
+        }
+        console.error('Error en uploadFile:', error);
+        return res.status(400).json({
+            ok: false,
+            msg: error.message || 'Error al subir el archivo',
+        });
     }
 }
 

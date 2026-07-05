@@ -282,34 +282,43 @@ export const updatePrestamoService = async (id, data) => {
 }
 
 export const uploadFileService = async (id, archivo) => {
+    // 1) Mimetype
     const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!tiposPermitidos.includes(archivo.mimetype)) {
-        throw new Error('Tipo de archivo no permitido');
+        throw new Error('Tipo de archivo no permitido. Solo PDF, JPG o PNG.');
     }
+
+    // 2) Tamaño y truncado (defensa en profundidad, en línea con el límite de 1 MB global)
+    if (archivo.truncated) {
+        throw new Error('El archivo fue truncado. Máximo 1 MB.');
+    }
+    if (archivo.size > 1 * 1024 * 1024) {
+        throw new Error('El archivo es demasiado grande. Máximo 1 MB.');
+    }
+
+    // 3) Mover a disco (await, sin callback)
+    const sanitizedFileName = sanitizeFileName(archivo.name);
+    const nombreArchivo = `${Date.now()}_${sanitizedFileName}`;
+    const rutaArchivo = `uploads/${id}/${nombreArchivo}`;
+
     try {
-        const sanitizedFileName = sanitizeFileName(archivo.name);
-        const nombreArchivo = `${Date.now()}_${sanitizedFileName}`;
-        const rutaArchivo = `uploads/${id}/${nombreArchivo}`;
+        await archivo.mv(rutaArchivo);
+    } catch (mvErr) {
+        console.error('Error guardando archivo:', mvErr);
+        throw new Error('No se pudo guardar el archivo en el servidor.');
+    }
 
-
-        await archivo.mv(rutaArchivo, async (err) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: 'Error al guardar el archivo' });
-            }
-
-            // Guardar información en la base de datos
-
-        });
-        const query = `
+    // 4) Registrar en DB (recién ahora, después de que el archivo está en disco)
+    const query = `
         INSERT INTO prestamo_archivos (prestamo_id, nombre_archivo, ruta_archivo)
         VALUES ($1, $2, $3) RETURNING *;
     `;
-        const values = [id, nombreArchivo, rutaArchivo];
-
-        return await executeInsert(query, values);
-    } catch (error) {
-        throw error;
+    try {
+        return await executeInsert(query, [id, nombreArchivo, rutaArchivo]);
+    } catch (dbErr) {
+        // Si la DB falla, borramos el archivo del disco para no dejar basura
+        try { await fs.unlink(rutaArchivo); } catch (_) { /* noop */ }
+        throw dbErr;
     }
 }
 
