@@ -77,7 +77,7 @@ export const getClienteById = async (req, res) => {
 export const crearCliente = async (req, res) => {
     const { nombre, apellido: apellidoNot, email: emailNot, telefono, direccion, ci, latitud, longitud, codigo_pais } = req.body;
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
-    const apellido = apellidoNot.toLowerCase();
+    const apellido = apellidoNot;
     const email = emailNot.toLowerCase();
     try {
         const newCliente = await crearClienteService({

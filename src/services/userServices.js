@@ -7,7 +7,7 @@ export const getUsuariosServices = async (data) => {
     const { page = 1, pageSize = 10, empresa_id } = data;
     try {
         const users = await executeSelect(
-            'SELECT * FROM usuarios WHERE empresa_id = $1 and estado=true',
+            'SELECT id, empresa_id, rol, nombre, apellido, telefono, email, ci, estado, created_at, updated_at FROM usuarios WHERE empresa_id = $1 and estado=true',
             [empresa_id],
             parseInt(page, 10),
             parseInt(pageSize, 10)
@@ -37,7 +37,7 @@ export const getUsuariosCobradoresServices = async (data) => {
 }
 export const getUsuarioByIdService = async (id) => {
     try {
-        const user = await executeSelectOne('SELECT * From usuarios where id = $1 and estado=true', [id]);
+        const user = await executeSelectOne('SELECT id, empresa_id, rol, nombre, apellido, telefono, email, ci, estado, created_at, updated_at From usuarios where id = $1 and estado=true', [id]);
         if (user.length === 0) {
             throw new Error('Usuario no encontrado');
         }
@@ -66,7 +66,7 @@ export const createUsuarioService = async (data) => {
         const query = `
             INSERT INTO usuarios (${campos.join(', ')})
             VALUES (${placeholders.join(', ')})
-            RETURNING *`;
+            RETURNING id, empresa_id, rol, nombre, apellido, telefono, email, ci, estado, created_at, updated_at`;
 
         const user = await executeInsert(query, valores);
         return user;
@@ -94,7 +94,7 @@ export const updateUsuarioService = async (id, data) => {
             UPDATE usuarios
             SET ${setQuery}
             WHERE id = $${placeholders.length + 1}
-            RETURNING *`;
+            RETURNING id, empresa_id, rol, nombre, apellido, telefono, email, ci, estado, created_at, updated_at`;
 
         valores.push(id); // Agregar ID al final para la condición WHERE
 
@@ -117,7 +117,7 @@ export const deleteUsuarioService = async (conditions) => {
         const query = `
             DELETE FROM usuarios
             WHERE ${whereClause}
-            RETURNING *`;
+            RETURNING id, empresa_id, rol, nombre, apellido, telefono, email, ci, estado, created_at, updated_at`;
 
         const deletedUser = await executeQuery(query, valores);
         if (deletedUser.length === 0) {
@@ -143,7 +143,7 @@ export const softDeleteUsuarioService = async (conditions, estado) => {
             UPDATE usuarios
             SET estado = ${estado}
             WHERE ${whereClause}
-            RETURNING *`;
+            RETURNING id, empresa_id, rol, nombre, apellido, telefono, email, ci, estado, created_at, updated_at`;
 
         const updatedUser = await executeQuery(query, valores);
         if (updatedUser.length === 0) {

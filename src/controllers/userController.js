@@ -121,9 +121,9 @@ export const update = async (req, res = response) => {
 }
 export const updateCobrador = async (req, res = response) => {
     const { id } = req.params;
-    const data = req.body;
+    const { nombre, apellido, email, password, telefono, codigo_pais } = req.body;
+    const data = { nombre, apellido, email, password, telefono, codigo_pais };
     try {
-        delete data.id;
         if (data.codigo_pais !== undefined) {
             data.codigo_pais = normalizarPhoneCode(data.codigo_pais);
         }

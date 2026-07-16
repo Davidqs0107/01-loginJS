@@ -72,6 +72,8 @@ npm run dev
 - **`admin`** — dueño de una financiera: gestiona su empresa, usuarios, préstamos, configuración.
 - **`cobrador`** — registra pagos en ruta, cierra su caja (arqueo), valida comprobantes.
 
+> Los endpoints de usuarios exigen rol: solo `admin`/`super_admin` listan usuarios; un `cobrador` solo puede leer y editar **su propio** usuario (y nunca su rol ni su empresa). Las respuestas del API nunca incluyen el hash de la contraseña.
+
 ## Módulos / funcionalidades
 
 - **Multi-tenant**: todo se aísla por `empresa_id` (extraído del JWT).
@@ -111,8 +113,8 @@ src/
 └── constants/          # enums (roles, estados, frecuencias)
 database/
 ├── db.sql              # esquema base completo
-├── migrations/         # migraciones incrementales (001–005)
-└── migrate_features_v2.sql  # bundle de 002–005 para aplicar en producción
+├── migrations/         # migraciones incrementales (001–008)
+└── migrate_features_v2.sql  # bundle de 002–006 para aplicar en producción
 ```
 
 ## Rutas principales
@@ -123,7 +125,7 @@ Todas bajo `/api`. Requieren header `x-token` (JWT), salvo `/api/auth/*` y `/api
 
 ## Migraciones en producción
 
-Las migraciones nuevas (002–005) están agrupadas en `database/migrate_features_v2.sql`. Es **aditivo, transaccional e idempotente** (usa `IF NOT EXISTS` y bloques `DO`), así que es seguro aplicarlo sobre datos existentes:
+Las migraciones nuevas (002–006) están agrupadas en `database/migrate_features_v2.sql`. Es **aditivo, transaccional e idempotente** (usa `IF NOT EXISTS` y bloques `DO`), así que es seguro aplicarlo sobre datos existentes:
 
 ```bash
 # Respalda primero

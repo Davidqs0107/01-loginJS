@@ -9,8 +9,13 @@ const { superAdmin, admin, cobrador } = userRol;
 const route = Router();
 route.use(validarJWT);
 
-route.get('/', getUsuarios);
-route.get('/:id', getById);
+const soloPropioOAdmin = (req, res, next) => {
+    if ([superAdmin, admin].includes(req.rol) || String(req.params.id) === String(req.id)) return next();
+    return res.status(403).json({ ok: false, message: 'No tiene permisos para realizar esta acción' });
+};
+
+route.get('/', [validarRol(superAdmin, admin)], getUsuarios);
+route.get('/:id', [soloPropioOAdmin], getById);
 route.post('/', [
     check('nombre', 'El nombre es obligatorio').not().isEmpty(),
     check('apellido', 'El apellido es obligatorio').not().isEmpty(),
@@ -23,7 +28,7 @@ route.put('/:id', [
     validarRol(superAdmin, admin)
 ], update);
 route.put('/cobrador/:id', [
-
+    soloPropioOAdmin
 ], updateCobrador);
 route.delete('/:id', [validarRol(superAdmin, admin)], deleteUsuario);
 route.delete('/soft/:id', [validarRol(superAdmin, admin)], softDeleteUsuario);
