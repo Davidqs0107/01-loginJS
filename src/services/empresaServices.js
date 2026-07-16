@@ -1,6 +1,7 @@
 import { buildDynamicQuery, buildQueryUpdate } from "../helpers/buildDynamicQuery.js";
 import { formatDateWithDateFns } from "../helpers/functions.js";
 import { executeInsert, executeSelectOne } from "../helpers/queryS.js";
+import { validarPhoneCode } from "../helpers/phoneCode.js";
 
 export const getEmpresaByIdService = async (id) => {
     try {
@@ -102,6 +103,9 @@ export const getSummaryCobradorService = async (id) => {
 }
 export const updateEmpresaService = async (id, data) => {
     try {
+        if (data.codigo_pais !== undefined && !validarPhoneCode(data.codigo_pais)) {
+            throw new Error('codigo_pais inválido. Formato esperado: +1 a +9999');
+        }
         const { campos, valores, placeholders } = buildDynamicQuery(data);
         if (campos.length === 0) {
             throw new Error('No se enviaron campos para actualizar');

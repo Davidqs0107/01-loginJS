@@ -9,6 +9,7 @@ export const configuracionDefault = {
     mora_tope: null,
     incumplido_dias: 90,
     moneda: 'BOB',
+    simbolo_moneda: 'Bs.',
 };
 
 export const moraTipos = {
@@ -38,9 +39,17 @@ export const getConfiguracionService = async (empresa_id) => {
  * campos permitidos que vengan definidos en `data`.
  */
 export const upsertConfiguracionService = async (empresa_id, data) => {
+    if (data.simbolo_moneda !== undefined) {
+        if (typeof data.simbolo_moneda !== 'string' ||
+            data.simbolo_moneda.length < 1 ||
+            data.simbolo_moneda.length > 5) {
+            throw new Error('simbolo_moneda debe tener entre 1 y 5 caracteres.');
+        }
+    }
+
     const campos = [
         'mora_activa', 'mora_tipo', 'mora_valor', 'mora_dias_gracia',
-        'mora_tope', 'incumplido_dias', 'moneda',
+        'mora_tope', 'incumplido_dias', 'moneda', 'simbolo_moneda',
     ];
 
     // Mezclar defaults con lo enviado, tomando solo campos válidos
@@ -51,8 +60,8 @@ export const upsertConfiguracionService = async (empresa_id, data) => {
 
     const rows = await executeQuery(
         `INSERT INTO configuracion_empresa
-            (empresa_id, mora_activa, mora_tipo, mora_valor, mora_dias_gracia, mora_tope, incumplido_dias, moneda)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            (empresa_id, mora_activa, mora_tipo, mora_valor, mora_dias_gracia, mora_tope, incumplido_dias, moneda, simbolo_moneda)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (empresa_id) DO UPDATE SET
             mora_activa      = EXCLUDED.mora_activa,
             mora_tipo        = EXCLUDED.mora_tipo,
@@ -61,12 +70,13 @@ export const upsertConfiguracionService = async (empresa_id, data) => {
             mora_tope        = EXCLUDED.mora_tope,
             incumplido_dias  = EXCLUDED.incumplido_dias,
             moneda           = EXCLUDED.moneda,
+            simbolo_moneda   = EXCLUDED.simbolo_moneda,
             updated_at       = CURRENT_TIMESTAMP
          RETURNING *`,
         [
             empresa_id,
             valores.mora_activa, valores.mora_tipo, valores.mora_valor, valores.mora_dias_gracia,
-            valores.mora_tope, valores.incumplido_dias, valores.moneda,
+            valores.mora_tope, valores.incumplido_dias, valores.moneda, valores.simbolo_moneda,
         ]
     );
     return rows[0];

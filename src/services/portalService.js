@@ -88,6 +88,7 @@ export const getPortalResumenService = async (token) => {
         cliente: { nombre: cliente.nombre, apellido: cliente.apellido, telefono: cliente.telefono, email: cliente.email },
         empresa: empresaRows[0] || null,
         moneda: config.moneda,
+        simbolo_moneda: config.simbolo_moneda,
         total_saldo: Math.round(totalSaldo * 100) / 100,
         total_mora: Math.round(totalMora * 100) / 100,
         prestamos,

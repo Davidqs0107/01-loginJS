@@ -28,9 +28,11 @@ class NotificacionesCuotasJob {
         cl.apellido as cliente_apellido,
         cl.email as cliente_email,
         cl.telefono as cliente_telefono,
+        cl.codigo_pais as cliente_codigo_pais,
         e.id as empresa_id,
         e.nombre as empresa_nombre,
         e.telefono as empresa_telefono,
+        e.codigo_pais as empresa_codigo_pais,
         e.direccion as empresa_direccion,
         p.id as prestamo_id
       FROM cuotas cu
@@ -132,6 +134,7 @@ class NotificacionesCuotasJob {
                         apellido: cuota.cliente_apellido,
                         email: cuota.cliente_email,
                         telefono: cuota.cliente_telefono,
+                        codigo_pais: cuota.cliente_codigo_pais,
                     };
 
                     const cuotaData = {
@@ -147,6 +150,7 @@ class NotificacionesCuotasJob {
                         id: cuota.empresa_id,
                         nombre: cuota.empresa_nombre,
                         telefono: cuota.empresa_telefono,
+                        codigo_pais: cuota.empresa_codigo_pais,
                         direccion: cuota.empresa_direccion,
                     };
 

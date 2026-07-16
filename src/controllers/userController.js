@@ -8,6 +8,7 @@ import { createUsuarioService, getUsuarioByIdService, getUsuariosCobradoresServi
 import { getPlanMaxUsuariosService } from "../services/adminService.js";
 import { userRol } from "../constants/usuarios.constants.js";
 import { notFoundError } from "../constants/notfound.constants.js";
+import { normalizarPhoneCode } from "../helpers/phoneCode.js";
 
 export const getUsuarios = async (req, res) => {
     const { page = 1, pageSize = 10 } = req.query; // Parámetros de paginación desde el cliente
@@ -53,7 +54,7 @@ export const getById = async (req, res = response) => {
 
 export const createUsuario = async (req, res = response) => {
 
-    const { nombre, apellido, email: emailnot, password, telefono, ci, rol = userRol.cobrador } = req.body;
+    const { nombre, apellido, email: emailnot, password, telefono, ci, rol = userRol.cobrador, codigo_pais } = req.body;
     const empresa_id = req.empresa_id; // Obtenido del middleware, por ejemplo, del token
     const plan_id = req.plan_id || 1;
     const email = emailnot.toLowerCase();
@@ -77,7 +78,8 @@ export const createUsuario = async (req, res = response) => {
             telefono,
             empresa_id,
             ci,
-            rol
+            rol,
+            codigo_pais: normalizarPhoneCode(codigo_pais),
         });
 
         return res.status(201).json({
@@ -97,6 +99,9 @@ export const update = async (req, res = response) => {
     const data = req.body;
     try {
         delete data.id;
+        if (data.codigo_pais !== undefined) {
+            data.codigo_pais = normalizarPhoneCode(data.codigo_pais);
+        }
         if (data.password) {
             data.password = bcrypt.hashSync(data.password, 10);
         }
@@ -119,6 +124,9 @@ export const updateCobrador = async (req, res = response) => {
     const data = req.body;
     try {
         delete data.id;
+        if (data.codigo_pais !== undefined) {
+            data.codigo_pais = normalizarPhoneCode(data.codigo_pais);
+        }
         if (data.password) {
             data.password = bcrypt.hashSync(data.password, 10);
         }

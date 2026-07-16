@@ -94,7 +94,7 @@ export const sofDeleteClientesService = async (conditions, estado) => {
 export const searchClientesService = async (query, empresa_id) => {
     try {
         const clientes = await executeSelectOne(
-            `SELECT id, nombre, apellido, ci, telefono, email FROM clientes
+            `SELECT id, nombre, apellido, ci, telefono, codigo_pais, email FROM clientes
              WHERE empresa_id = $1 AND estado = true AND (nombre ILIKE $2 OR apellido ILIKE $2 OR ci ILIKE $2)
              LIMIT 20`,
             [empresa_id, `%${query}%`]

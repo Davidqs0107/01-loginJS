@@ -1,6 +1,7 @@
 import { response } from 'express';
 import { getEmpresaByIdService, getSummaryCobradorService, getSummaryService, updateEmpresaService } from '../services/empresaServices.js';
 import { getSuscripcionEstadoService } from '../services/suscripcionService.js';
+import { normalizarPhoneCode } from '../helpers/phoneCode.js';
 
 export const getSuscripcion = async (req, res = response) => {
     try {
@@ -62,6 +63,9 @@ export const updateEmpresa = async (req, res = response) => {
     const empresaId = req.empresa_id;
     const data = req.body;
     try {
+        if (data.codigo_pais !== undefined) {
+            data.codigo_pais = normalizarPhoneCode(data.codigo_pais);
+        }
         const updatedEmpresa = await updateEmpresaService(empresaId, data);
         return res.status(200).json({
             ok: true,

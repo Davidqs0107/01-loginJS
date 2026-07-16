@@ -2,6 +2,7 @@ import { notFoundError } from "../constants/notfound.constants.js";
 import { crearClienteService, getClienteByIdService, getClientesServices, searchClientesService, sofDeleteClientesService, updateClientesService } from "../services/clientesServices.js";
 import { getScoreClienteService } from "../services/scoreService.js";
 import { generarTokenPortalService, revocarTokenPortalService } from "../services/portalService.js";
+import { normalizarPhoneCode } from "../helpers/phoneCode.js";
 
 export const generarTokenPortal = async (req, res) => {
     const { id } = req.params;
@@ -74,7 +75,7 @@ export const getClienteById = async (req, res) => {
 }
 
 export const crearCliente = async (req, res) => {
-    const { nombre, apellido: apellidoNot, email: emailNot, telefono, direccion, ci, latitud, longitud } = req.body;
+    const { nombre, apellido: apellidoNot, email: emailNot, telefono, direccion, ci, latitud, longitud, codigo_pais } = req.body;
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     const apellido = apellidoNot.toLowerCase();
     const email = emailNot.toLowerCase();
@@ -88,6 +89,7 @@ export const crearCliente = async (req, res) => {
             ci,
             latitud,
             longitud,
+            codigo_pais: normalizarPhoneCode(codigo_pais),
             empresa_id
         });
         return res.status(201).json({
@@ -105,6 +107,9 @@ export const updateCliente = async (req, res) => {
     const { id } = req.params;
     const data = req.body;
     delete data.id; // Eliminar el ID del body
+    if (data.codigo_pais !== undefined) {
+        data.codigo_pais = normalizarPhoneCode(data.codigo_pais);
+    }
     try {
         const updatedCliente = await updateClientesService(id, data);
         return res.status(200).json({

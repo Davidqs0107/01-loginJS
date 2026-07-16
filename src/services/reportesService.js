@@ -38,6 +38,7 @@ export const getReporteMoraService = async ({
         SELECT
             c.nombre || ' ' || c.apellido       AS cliente,
             c.telefono,
+            c.codigo_pais,
             c.ci,
             c.direccion,
             p.id                                AS prestamo_id,
@@ -133,6 +134,7 @@ export const getReporteCobrosService = async ({ empresa_id, fecha_inicio, fecha_
             u.id                                                                        AS cobrador_id,
             u.nombre || ' ' || u.apellido                                               AS cobrador,
             u.telefono,
+            u.codigo_pais,
             COUNT(pag.id)                                                               AS num_pagos,
             COALESCE(SUM(pag.monto), 0)                                                 AS total_cobrado,
             COALESCE(SUM(pag.monto) FILTER (WHERE pag.tipo_pago = 'efectivo'), 0)       AS total_efectivo,
@@ -143,7 +145,7 @@ export const getReporteCobrosService = async ({ empresa_id, fecha_inicio, fecha_
         WHERE u.empresa_id = $1
             AND u.rol = 'cobrador'
             AND u.estado = true
-        GROUP BY u.id, u.nombre, u.apellido, u.telefono
+        GROUP BY u.id, u.nombre, u.apellido, u.telefono, u.codigo_pais
         ORDER BY total_cobrado DESC
     `;
 
@@ -178,6 +180,7 @@ export const getReporteAgendaService = async ({
         SELECT
             c.nombre || ' ' || c.apellido   AS cliente,
             c.telefono,
+            c.codigo_pais,
             c.direccion,
             c.ci,
             cu.id                           AS cuota_id,
@@ -235,7 +238,7 @@ export const getReporteRecaudacionService = async ({ empresa_id, fecha_inicio, f
  */
 export const getReporteFichaClienteService = async ({ empresa_id, cliente_id }) => {
     const clienteQuery = `
-        SELECT id, nombre, apellido, telefono, email, ci, direccion
+        SELECT id, nombre, apellido, telefono, codigo_pais, email, ci, direccion
         FROM clientes
         WHERE id = $1 AND empresa_id = $2
     `;
@@ -328,6 +331,7 @@ export const getReportePrestamosClienteService = async ({
             c.nombre || ' ' || c.apellido       AS cliente,
             c.ci,
             c.telefono,
+            c.codigo_pais,
             c.direccion,
             p.id                                AS prestamo_id,
             p.monto                             AS capital,
@@ -353,7 +357,7 @@ export const getReportePrestamosClienteService = async ({
             AND c.estado = true
             ${extraFilters}
         GROUP BY
-            c.id, c.nombre, c.apellido, c.ci, c.telefono, c.direccion,
+            c.id, c.nombre, c.apellido, c.ci, c.telefono, c.codigo_pais, c.direccion,
             p.id, p.monto, p.tasa_interes, p.frecuencia_pago, p.total_cuotas,
             p.fecha_inicio, p.estado_prestamo, p.tipo_prestamo,
             u.nombre, u.apellido

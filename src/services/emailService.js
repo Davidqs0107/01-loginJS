@@ -1,4 +1,6 @@
 import pkg from 'nodemailer';
+import { getConfiguracionService } from './configuracionService.js';
+import { formatMoney, formatPhone } from '../helpers/format.js';
 const { createTransport } = pkg;
 
 /**
@@ -40,6 +42,10 @@ const enviarRecordatorioCuota = async (cliente, cuota, empresa) => {
             day: 'numeric',
         });
 
+        // Símbolo de moneda configurado por la empresa
+        const config = await getConfiguracionService(empresa.id);
+        const simbolo = config?.simbolo_moneda || 'Bs.';
+
         const mailOptions = {
             from: `"${empresa.nombre}" <${process.env.EMAIL_USER}>`,
             to: cliente.email,
@@ -72,17 +78,17 @@ const enviarRecordatorioCuota = async (cliente, cuota, empresa) => {
               
               <div class="cuota-info">
                 <p><strong>📝 Cuota #${cuota.numero_cuota}</strong></p>
-                <p><strong>💰 Monto:</strong> <span class="monto">$${parseFloat(cuota.monto).toFixed(2)}</span></p>
+                <p><strong>💰 Monto:</strong> <span class="monto">${formatMoney(cuota.monto, simbolo)}</span></p>
                 <p><strong>📅 Fecha de vencimiento:</strong> ${fechaFormateada}</p>
-                <p><strong>💳 Monto pagado:</strong> $${parseFloat(cuota.monto_pagado || 0).toFixed(2)}</p>
-                <p><strong>💵 Saldo pendiente:</strong> $${parseFloat(cuota.monto - (cuota.monto_pagado || 0)).toFixed(2)}</p>
+                <p><strong>💳 Monto pagado:</strong> ${formatMoney(cuota.monto_pagado || 0, simbolo)}</p>
+                <p><strong>💵 Saldo pendiente:</strong> ${formatMoney(cuota.monto - (cuota.monto_pagado || 0), simbolo)}</p>
               </div>
               
               <p class="warning">⚠️ Esta cuota vence en 2 días</p>
               
               <p>Para realizar su pago, puede contactarnos a través de:</p>
               <ul>
-                ${empresa.telefono ? `<li>📞 Teléfono: ${empresa.telefono}</li>` : ''}
+                ${empresa.telefono ? `<li>📞 Teléfono: ${formatPhone(empresa.telefono, empresa.codigo_pais)}</li>` : ''}
                 ${empresa.direccion ? `<li>📍 Dirección: ${empresa.direccion}</li>` : ''}
               </ul>
               
@@ -105,9 +111,9 @@ Estimado/a ${cliente.nombre} ${cliente.apellido},
 Le recordamos que tiene una cuota próxima a vencer:
 
 Cuota #${cuota.numero_cuota}
-Monto: $${parseFloat(cuota.monto).toFixed(2)}
+Monto: ${formatMoney(cuota.monto, simbolo)}
 Fecha de vencimiento: ${fechaFormateada}
-Saldo pendiente: $${parseFloat(cuota.monto - (cuota.monto_pagado || 0)).toFixed(2)}
+Saldo pendiente: ${formatMoney(cuota.monto - (cuota.monto_pagado || 0), simbolo)}
 
 ⚠️ Esta cuota vence en 2 días
 

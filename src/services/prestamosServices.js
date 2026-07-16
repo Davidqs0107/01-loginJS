@@ -13,8 +13,8 @@ export const getPrestamosServices = async (data) => {
 
     try {
         let query = `
-            SELECT p.*, 
-                   c.nombre, c.apellido, c.telefono, c.direccion, c.email,
+            SELECT p.*,
+                   c.nombre, c.apellido, c.telefono, c.codigo_pais, c.direccion, c.email,
                    COALESCE(SUM(cu.monto), 0) as monto_total_cuotas,
                    COALESCE(SUM(cu.monto_pagado), 0) as monto_pagado,
                    COALESCE(SUM(cu.monto), 0) - COALESCE(SUM(cu.monto_pagado), 0) as saldo
@@ -53,10 +53,10 @@ export const getPrestamosServices = async (data) => {
 export const getPrestamosByIdService = async (id, empresa_id, mostrarCuotas) => {
     try {
         const prestamo = await executeSelectOne(
-            `SELECT p.*, c.nombre ,c.apellido ,c.telefono ,c.direccion ,c.direccion ,c.email, c.ci
+            `SELECT p.*, c.nombre, c.apellido, c.telefono, c.codigo_pais, c.direccion, c.direccion, c.email, c.ci
                 ,c.latitud,c.longitud
-                FROM prestamos p join clientes c 
-                on p.cliente_id = c.id 
+                FROM prestamos p join clientes c
+                on p.cliente_id = c.id
                 WHERE p.id = $1 
                 AND p.empresa_id = $2`,
             [id, empresa_id]

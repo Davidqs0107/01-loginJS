@@ -3,6 +3,7 @@
 */
 import { Router } from "express";
 import { getEmpresaByName, getEmpresas, getPlanes, getSuscripciones, getUsuariosByEmpresa, limpiarDatosEmpresa, updateEmpresaPlan, updatePlanMaxUsuarios } from "../controllers/adminController.js";
+import { getCrecimientoEmpresas, getDistribucionPlanes, getEmpresasRecientes, getGlobalMetrics, getSuscripcionesCriticas } from "../controllers/adminMetricsController.js";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarRol } from "../middlewares/validar-rol.js";
 import { userRol } from "../constants/usuarios.constants.js";
@@ -21,6 +22,13 @@ route.get('/suscripciones', [validarRol(superAdmin)], getSuscripciones);
 route.put('/', [validarRol(superAdmin)], updateEmpresaPlan);
 route.put('/planes/:id', [validarRol(superAdmin)], updatePlanMaxUsuarios);
 route.delete('/limpiar/:empresa_id', [validarRol(superAdmin)], limpiarDatosEmpresa);
+
+// Métricas para dashboard superadmin
+route.get('/metrics/global', [validarRol(superAdmin)], getGlobalMetrics);
+route.get('/metrics/crecimiento-empresas', [validarRol(superAdmin)], getCrecimientoEmpresas);
+route.get('/metrics/distribucion-planes', [validarRol(superAdmin)], getDistribucionPlanes);
+route.get('/metrics/empresas-recientes', [validarRol(superAdmin)], getEmpresasRecientes);
+route.get('/metrics/suscripciones-criticas', [validarRol(superAdmin)], getSuscripcionesCriticas);
 
 // Endpoint para ejecutar manualmente el job de notificaciones (útil para pruebas)
 route.post('/test-notificaciones', [validarRol(superAdmin)], async (req, res) => {
