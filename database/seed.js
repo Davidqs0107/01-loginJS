@@ -58,6 +58,7 @@ const limpiarSeed = async (client) => {
     );
     const ids = rows.map((r) => Number(r.id));
     for (const empresa_id of ids) {
+        await client.query(`DELETE FROM comprobantes_pago WHERE empresa_id = $1`, [empresa_id]);
         await client.query(
             `DELETE FROM pagos WHERE cuota_id IN (
                 SELECT cu.id FROM cuotas cu JOIN prestamos p ON cu.prestamo_id = p.id WHERE p.empresa_id = $1)`,
@@ -74,6 +75,7 @@ const limpiarSeed = async (client) => {
         await client.query(`DELETE FROM prestamos WHERE empresa_id = $1`, [empresa_id]);
         await client.query(`DELETE FROM descargos WHERE empresa_id = $1`, [empresa_id]);
         await client.query(`DELETE FROM clientes WHERE empresa_id = $1`, [empresa_id]);
+        await client.query(`DELETE FROM arqueos WHERE empresa_id = $1`, [empresa_id]);
         await client.query(`DELETE FROM usuarios WHERE empresa_id = $1`, [empresa_id]);
         await client.query(`DELETE FROM empresa_planes WHERE empresa_id = $1`, [empresa_id]);
         await client.query(`DELETE FROM empresas WHERE id = $1`, [empresa_id]);
