@@ -91,7 +91,7 @@ export const crearCliente = async (req, res) => {
             longitud,
             codigo_pais: normalizarPhoneCode(codigo_pais),
             empresa_id
-        });
+        }, { usuario_id: req.id, ip: req.ip });
         return res.status(201).json({
             ok: true,
             cliente: newCliente
@@ -111,7 +111,7 @@ export const updateCliente = async (req, res) => {
         data.codigo_pais = normalizarPhoneCode(data.codigo_pais);
     }
     try {
-        const updatedCliente = await updateClientesService(id, data);
+        const updatedCliente = await updateClientesService(id, data, { usuario_id: req.id, empresa_id: req.empresa_id, ip: req.ip });
         return res.status(200).json({
             ok: true,
             cliente: updatedCliente,
@@ -129,7 +129,7 @@ export const softDeleteCliente = async (req, res) => {
     const empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     const { estado = true } = req.query;
     try {
-        const updatedCliente = await sofDeleteClientesService({ id, empresa_id }, estado);
+        const updatedCliente = await sofDeleteClientesService({ id, empresa_id }, estado, { usuario_id: req.id, ip: req.ip });
         return res.status(200).json({
             ok: true,
             cliente: updatedCliente,

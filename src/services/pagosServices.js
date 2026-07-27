@@ -89,7 +89,7 @@ export const getPagosByIdServices = async (data) => {
 }
 
 export const crearPagoService = async (data) => {
-    const { cuota_id, usuario_id, empresa_id, monto, fecha_pago, tipo_pago } = data;
+    const { cuota_id, usuario_id, empresa_id, monto, fecha_pago, tipo_pago, ip = null } = data;
 
     const montoPago = parseFloat(monto);
     if (isNaN(montoPago) || montoPago <= 0) {
@@ -161,6 +161,18 @@ export const crearPagoService = async (data) => {
             // Recalcular el estado del préstamo (pendiente/activo/completado)
             await recalcularEstadoPrestamo(client, prestamoId);
 
+            // Registrar en la bitácora de auditoría (misma transacción)
+            await registrarAuditoria({
+                client,
+                empresa_id,
+                usuario_id,
+                accion: 'crear_pago',
+                entidad: 'pago',
+                entidad_id: pagoResult.rows[0].id,
+                datos_despues: { cuota_id, monto_aplicado: montoAplicado, mora_aplicada: moraAplicada, tipo_pago },
+                ip,
+            });
+
             const mensajes = [];
             if (moraAplicada > 0) mensajes.push(`Se aplicaron ${moraAplicada} a mora.`);
             if (excedente > 0) mensajes.push(`El excedente es ${excedente}.`);
@@ -200,7 +212,7 @@ export const crearPagoService = async (data) => {
  * @returns {object} Objeto con el resumen de las cuotas pagadas y el excedente.
  */
 export const crearMultipagoService = async (data) => {
-    const { prestamo_id, usuario_id, empresa_id, montoTotal, fecha_pago, tipo_pago } = data;
+    const { prestamo_id, usuario_id, empresa_id, montoTotal, fecha_pago, tipo_pago, ip = null } = data;
     let montoPendiente = parseFloat(montoTotal);
     const pagosRealizados = [];
 
@@ -294,6 +306,22 @@ export const crearMultipagoService = async (data) => {
 
             // Recalcular el estado del préstamo tras aplicar el multipago
             await recalcularEstadoPrestamo(client, prestamo_id);
+
+            // Registrar en la bitácora de auditoría: un solo registro por operación (no por cuota)
+            await registrarAuditoria({
+                client,
+                empresa_id,
+                usuario_id,
+                accion: 'crear_multipago',
+                entidad: 'prestamo',
+                entidad_id: prestamo_id,
+                datos_despues: {
+                    monto_total: montoTotal,
+                    cuotas_afectadas: pagosRealizados.map((p) => p.cuota.numero_cuota),
+                    tipo_pago,
+                },
+                ip,
+            });
 
             return {
                 pagosRealizados: pagosRealizados,
@@ -390,8 +418,14 @@ export const eliminarPagoService = async (pagoId, empresa_id, actor = {}) => {
     }
 }
 
-export const getPagosService = async (empresa_id, fecha_inicio, fecha_fin) => {
+export const getPagosService = async (empresa_id, fecha_inicio, fecha_fin, usuario_id = null) => {
     try {
+        const params = [empresa_id, fecha_inicio, fecha_fin];
+        let filtroUsuario = '';
+        if (usuario_id) {
+            params.push(usuario_id);
+            filtroUsuario = `AND p.usuario_id = $${params.length}`;
+        }
         const pagos = await executeSelect(
             `SELECT p.*, c.numero_cuota, c.monto as monto_cuota, c.monto_pagado,
                     cl.nombre as cliente_nombre, cl.apellido as cliente_apellido,
@@ -402,8 +436,9 @@ export const getPagosService = async (empresa_id, fecha_inicio, fecha_fin) => {
              JOIN clientes cl ON pr.cliente_id = cl.id
              WHERE pr.empresa_id = $1
              AND p.fecha_pago BETWEEN $2 AND $3
+             ${filtroUsuario}
              ORDER BY p.fecha_pago DESC`,
-            [empresa_id, fecha_inicio, fecha_fin]
+            params
         );
         return pagos;
     } catch (error) {

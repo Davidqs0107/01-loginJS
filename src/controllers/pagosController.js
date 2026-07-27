@@ -53,6 +53,7 @@ export const crearPago = async (req, res) => {
     const data = req.body;
     data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     data.usuario_id = req.id; // ID del usuario desde el middleware
+    data.ip = req.ip;
     try {
         const { pagoId, mensajeExcedente, cuotaActualizada, montoAplicado } = await crearPagoService(data);
         res.status(201).json({
@@ -76,6 +77,7 @@ export const crearMultipago = async (req, res) => {
     const data = req.body;
     data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware (aísla el multipago por tenant)
     data.usuario_id = req.id; // ID del usuario que registra el pago (desde el middleware)
+    data.ip = req.ip;
 
     // Se asume que el body contiene: { prestamo_id, montoTotal, fecha_pago, tipo_pago }
 
@@ -148,8 +150,10 @@ export const eliminarPago = async (req, res) => {
 export const getPagos = async (req, res) => {
     const { fecha_inicio, fecha_fin } = req.query;
     const empresa_id = req.empresa_id;
+    // El cobrador solo puede ver sus propios pagos
+    const usuario_id = req.rol === 'cobrador' ? req.id : null;
     try {
-        const pagos = await getPagosService(empresa_id, fecha_inicio, fecha_fin);
+        const pagos = await getPagosService(empresa_id, fecha_inicio, fecha_fin, usuario_id);
         return res.status(200).json({
             ok: true,
             pagos: pagos.data || pagos,

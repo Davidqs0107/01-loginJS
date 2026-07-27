@@ -1,5 +1,5 @@
 import { formatDateWithDateFns } from "../helpers/functions.js";
-import { executeQuery, executeSelect } from "../helpers/queryS.js";
+import { executeQuery, executeSelect, executeSelectOne } from "../helpers/queryS.js";
 
 export const getEmpresasService = async (data) => {
     const { page, pageSize, fecha_inicio, fecha_fin } = data;

@@ -1,6 +1,7 @@
 import { notFoundError } from "../constants/notfound.constants.js";
 import { buildDynamicQuery, buildQueryCreate, buildQueryUpdate, buildWhereClause } from "../helpers/buildDynamicQuery.js";
 import { executeInsert, executeQuery, executeSelect, executeSelectOne } from "../helpers/queryS.js";
+import { registrarAuditoria } from "./auditoriaService.js";
 
 export const getClientesServices = async (data) => {
     const { page, pageSize, empresa_id } = data;
@@ -29,7 +30,7 @@ export const getClienteByIdService = async (id, empresa_id) => {
     }
 }
 
-export const crearClienteService = async (data) => {
+export const crearClienteService = async (data, actor = {}) => {
     const { empresa_id, ...otherData } = data;
 
     try {
@@ -46,6 +47,17 @@ export const crearClienteService = async (data) => {
         const query = buildQueryCreate(campos, placeholders, 'clientes');
 
         const cliente = await executeInsert(query, valores);
+
+        await registrarAuditoria({
+            empresa_id,
+            usuario_id: actor.usuario_id,
+            accion: 'crear_cliente',
+            entidad: 'cliente',
+            entidad_id: cliente.id,
+            datos_despues: { nombre: cliente.nombre, apellido: cliente.apellido, ci: cliente.ci },
+            ip: actor.ip ?? null,
+        });
+
         return cliente;
     } catch (error) {
         console.error('Error en crearClienteService:', error);
@@ -53,7 +65,7 @@ export const crearClienteService = async (data) => {
     }
 }
 
-export const updateClientesService = async (id, data) => {
+export const updateClientesService = async (id, data, actor = {}) => {
     try {
         const { campos, valores, placeholders } = buildDynamicQuery(data);
         if (campos.length === 0) {
@@ -62,6 +74,17 @@ export const updateClientesService = async (id, data) => {
         const query = buildQueryUpdate(campos, placeholders, 'clientes');
         valores.push(id);
         const empresa = await executeInsert(query, valores);
+
+        await registrarAuditoria({
+            empresa_id: actor.empresa_id,
+            usuario_id: actor.usuario_id,
+            accion: 'editar_cliente',
+            entidad: 'cliente',
+            entidad_id: Number(id),
+            datos_despues: { nombre: empresa?.nombre, apellido: empresa?.apellido, ci: empresa?.ci },
+            ip: actor.ip ?? null,
+        });
+
         return empresa;
 
     } catch (error) {
@@ -70,7 +93,7 @@ export const updateClientesService = async (id, data) => {
     }
 }
 
-export const sofDeleteClientesService = async (conditions, estado) => {
+export const sofDeleteClientesService = async (conditions, estado, actor = {}) => {
     try {
         const { whereClause, valores } = buildWhereClause(conditions);
         const query = `
@@ -83,7 +106,19 @@ export const sofDeleteClientesService = async (conditions, estado) => {
             throw new Error('No se encontró el cliente para desactivar');
         }
 
-        return updatedCliente[0];
+        const cliente = updatedCliente[0];
+
+        await registrarAuditoria({
+            empresa_id: conditions.empresa_id ?? actor.empresa_id,
+            usuario_id: actor.usuario_id,
+            accion: 'eliminar_cliente',
+            entidad: 'cliente',
+            entidad_id: cliente.id,
+            datos_despues: { nombre: cliente.nombre, apellido: cliente.apellido, ci: cliente.ci },
+            ip: actor.ip ?? null,
+        });
+
+        return cliente;
 
     } catch (error) {
         console.error('Error en sofDeleteClientesService:', error);

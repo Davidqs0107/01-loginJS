@@ -5,6 +5,9 @@ import { executeInsert, executeQuery, executeSelect, executeSelectOne } from "..
 import { sanitizeFileName } from "../helpers/sanityFileName.js";
 import { executeTransaction } from "../helpers/transactionSql.js";
 import { registrarAuditoria } from "./auditoriaService.js";
+import { getConfiguracionService } from "./configuracionService.js";
+import { calcularMora } from "../helpers/mora.js";
+import { diasDeAtraso } from "../helpers/pagoWaterfall.js";
 import fs from 'fs/promises';
 import moment from "moment";
 
@@ -66,11 +69,39 @@ export const getPrestamosByIdService = async (id, empresa_id, mostrarCuotas) => 
         }
         if (mostrarCuotas) {
             const { data } = await executeSelect(
-                `SELECT * FROM cuotas 
-                WHERE prestamo_id = $1
+                `SELECT cu.*,
+                        (SELECT COALESCE(SUM(pg.monto_mora), 0) FROM pagos pg WHERE pg.cuota_id = cu.id) AS mora_cobrada
+                FROM cuotas cu
+                WHERE cu.prestamo_id = $1
                 order by numero_cuota asc`,
                 [id], 1, 10000
             );
+
+            // Mora pendiente (no persistida): cuánto de la mora calculada al vuelo
+            // todavía no fue cobrada. Si falla la config, no rompe el detalle del préstamo.
+            if (data.length > 0) {
+                let config = null;
+                try {
+                    config = await getConfiguracionService(empresa_id);
+                } catch (_) {
+                    config = null;
+                }
+                for (const c of data) {
+                    if (config && (c.estado === 'pendiente' || c.estado === 'parcial')) {
+                        const saldo = parseFloat(c.monto) - parseFloat(c.monto_pagado || 0);
+                        const moraTotal = calcularMora({
+                            saldoPendiente: saldo,
+                            montoCuota: c.monto,
+                            diasAtraso: diasDeAtraso(c.fecha_pago),
+                            config,
+                        });
+                        c.mora_pendiente = Math.max(0, Math.round((moraTotal - parseFloat(c.mora_cobrada)) * 100) / 100);
+                    } else {
+                        c.mora_pendiente = 0;
+                    }
+                }
+            }
+
             prestamo[0].cuotas = data;
         }
 
@@ -158,7 +189,28 @@ const insertarPrestamoConCuotas = async (client, data) => {
 
 export const crearPrestamoService = async (data) => {
     try {
-        return await executeTransaction(async (client) => insertarPrestamoConCuotas(client, data));
+        return await executeTransaction(async (client) => {
+            const result = await insertarPrestamoConCuotas(client, data);
+
+            await registrarAuditoria({
+                client,
+                empresa_id: data.empresa_id,
+                usuario_id: data.usuario_id,
+                accion: 'crear_prestamo',
+                entidad: 'prestamo',
+                entidad_id: result.prestamo[0].id,
+                datos_despues: {
+                    cliente_id: data.cliente_id,
+                    monto: data.monto,
+                    tasa_interes: data.tasa_interes,
+                    total_cuotas: data.total_cuotas,
+                    tipo_prestamo: data.tipo_prestamo,
+                },
+                ip: data.ip ?? null,
+            });
+
+            return result;
+        });
     } catch (error) {
         throw error;
     }
@@ -366,8 +418,14 @@ export const deleteFileService = async (prestamoId, archivoId) => {
     }
 }
 
-export const completarPrestamoService = async (id) => {
+export const completarPrestamoService = async (id, actor = {}) => {
     try {
+        const prevResult = await executeQuery(
+            `SELECT estado_prestamo FROM prestamos WHERE id = $1`,
+            [id]
+        );
+        const estadoAnterior = prevResult[0]?.estado_prestamo ?? null;
+
         const result = await executeQuery(
             `UPDATE prestamos SET estado_prestamo = 'completado', updated_at = CURRENT_TIMESTAMP
              WHERE id = $1 RETURNING *`,
@@ -376,6 +434,18 @@ export const completarPrestamoService = async (id) => {
         if (result.length === 0) {
             throw new Error('Préstamo no encontrado');
         }
+
+        await registrarAuditoria({
+            empresa_id: actor.empresa_id,
+            usuario_id: actor.usuario_id,
+            accion: 'completar_prestamo',
+            entidad: 'prestamo',
+            entidad_id: Number(id),
+            datos_antes: { estado_anterior: estadoAnterior },
+            datos_despues: { estado: 'completado' },
+            ip: actor.ip ?? null,
+        });
+
         return result[0];
     } catch (error) {
         throw error;

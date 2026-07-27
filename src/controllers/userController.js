@@ -80,7 +80,7 @@ export const createUsuario = async (req, res = response) => {
             ci,
             rol,
             codigo_pais: normalizarPhoneCode(codigo_pais),
-        });
+        }, { usuario_id: req.id, ip: req.ip });
 
         return res.status(201).json({
             ok: true,

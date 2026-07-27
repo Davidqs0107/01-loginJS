@@ -97,6 +97,7 @@ export const crearPrestamo = async (req, res) => {
     const data = req.body;
     data.empresa_id = req.empresa_id; // ID de la empresa desde el middleware
     data.usuario_id = req.id; // ID del usuario desde el middleware
+    data.ip = req.ip;
     try {
         const { prestamo, cuotas } = await crearPrestamoService(data);
         // Lógica para crear un prestamo
@@ -214,7 +215,7 @@ export const deleteFile = async (req, res = response) => {
 export const completarPrestamo = async (req, res = response) => {
     const { id } = req.params;
     try {
-        const result = await completarPrestamoService(id);
+        const result = await completarPrestamoService(id, { usuario_id: req.id, empresa_id: req.empresa_id, ip: req.ip });
         return res.status(200).json({
             ok: true,
             prestamo: result

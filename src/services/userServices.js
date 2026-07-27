@@ -1,6 +1,7 @@
 import { notFoundError } from "../constants/notfound.constants.js";
 import { buildDynamicQuery, buildWhereClause } from "../helpers/buildDynamicQuery.js";
 import { executeInsert, executeQuery, executeSelect, executeSelectOne } from "../helpers/queryS.js";
+import { registrarAuditoria } from "./auditoriaService.js";
 import bcrypt from 'bcrypt';
 
 export const getUsuariosServices = async (data) => {
@@ -47,7 +48,7 @@ export const getUsuarioByIdService = async (id) => {
     }
 }
 
-export const createUsuarioService = async (data) => {
+export const createUsuarioService = async (data, actor = {}) => {
     const { empresa_id, password: pass, ...otherData } = data;
 
     try {
@@ -69,6 +70,17 @@ export const createUsuarioService = async (data) => {
             RETURNING id, empresa_id, rol, nombre, apellido, telefono, email, ci, estado, created_at, updated_at`;
 
         const user = await executeInsert(query, valores);
+
+        await registrarAuditoria({
+            empresa_id,
+            usuario_id: actor.usuario_id,
+            accion: 'crear_usuario',
+            entidad: 'usuario',
+            entidad_id: user.id,
+            datos_despues: { nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol },
+            ip: actor.ip ?? null,
+        });
+
         return user;
     } catch (error) {
         console.error('Error en createUsuarioService:', error);
