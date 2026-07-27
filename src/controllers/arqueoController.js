@@ -1,4 +1,4 @@
-import { cerrarArqueoService, getArqueosService, getResumenDiaService, resolverArqueoService } from "../services/arqueoService.js";
+import { cerrarArqueoService, getArqueosPendientesService, getArqueosService, getResumenDiaService, resolverArqueoService } from "../services/arqueoService.js";
 import { registrarAuditoria } from "../services/auditoriaService.js";
 
 /**
@@ -55,6 +55,18 @@ export const resolverArqueo = async (req, res) => {
     } catch (error) {
         console.error('Error en resolverArqueo:', error.message);
         return res.status(400).json({ ok: false, msg: error.message });
+    }
+};
+
+/** Días con cobros sin arquear por cobrador, para la alerta del admin. */
+export const getArqueosPendientes = async (req, res) => {
+    const empresa_id = req.empresa_id;
+    try {
+        const pendientes = await getArqueosPendientesService({ empresa_id });
+        return res.status(200).json({ ok: true, pendientes });
+    } catch (error) {
+        console.error('Error en getArqueosPendientes:', error);
+        res.status(500).json({ ok: false, msg: 'Error al obtener los arqueos pendientes.' });
     }
 };
 

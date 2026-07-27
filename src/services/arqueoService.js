@@ -88,6 +88,38 @@ export const resolverArqueoService = async ({ id, empresa_id, estado, aprobado_p
 };
 
 /**
+ * Días con cobros registrados que todavía no tienen arqueo cerrado, por cobrador.
+ * Alerta para el admin.
+ */
+export const getArqueosPendientesService = async ({ empresa_id }) => {
+    // ponytail: ventana fija de 30 días — si algún día quieren histórico completo, parametrizar
+    const rows = await executeQuery(
+        `SELECT pg.usuario_id,
+                u.nombre || ' ' || COALESCE(u.apellido,'') AS cobrador,
+                COUNT(DISTINCT pg.fecha_pago::date) AS dias_pendientes,
+                COALESCE(SUM(pg.monto + COALESCE(pg.monto_mora,0)), 0) AS total_sin_arquear,
+                MIN(pg.fecha_pago::date) AS fecha_mas_antigua
+         FROM pagos pg
+         JOIN cuotas cu ON pg.cuota_id = cu.id
+         JOIN prestamos p ON cu.prestamo_id = p.id
+         JOIN usuarios u ON pg.usuario_id = u.id
+         LEFT JOIN arqueos a ON a.empresa_id = p.empresa_id AND a.usuario_id = pg.usuario_id AND a.fecha = pg.fecha_pago::date
+         WHERE p.empresa_id = $1
+           AND pg.fecha_pago::date < CURRENT_DATE
+           AND pg.fecha_pago::date >= CURRENT_DATE - INTERVAL '30 days'
+           AND a.id IS NULL
+         GROUP BY pg.usuario_id, u.nombre, u.apellido
+         ORDER BY MIN(pg.fecha_pago::date)`,
+        [empresa_id]
+    );
+    return rows.map((r) => ({
+        ...r,
+        dias_pendientes: parseInt(r.dias_pendientes, 10),
+        total_sin_arquear: round2(parseFloat(r.total_sin_arquear)),
+    }));
+};
+
+/**
  * Lista los arqueos de la empresa, con filtros opcionales por cobrador y rango de fechas.
  */
 export const getArqueosService = async ({ empresa_id, usuario_id, fecha_inicio, fecha_fin, page = 1, pageSize = 30 }) => {
