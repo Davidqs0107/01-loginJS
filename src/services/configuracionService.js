@@ -10,6 +10,7 @@ export const configuracionDefault = {
     incumplido_dias: 90,
     moneda: 'BOB',
     simbolo_moneda: 'Bs.',
+    cancelacion_cuotas_interes: 1,
 };
 
 export const moraTipos = {
@@ -50,6 +51,7 @@ export const upsertConfiguracionService = async (empresa_id, data) => {
     const campos = [
         'mora_activa', 'mora_tipo', 'mora_valor', 'mora_dias_gracia',
         'mora_tope', 'incumplido_dias', 'moneda', 'simbolo_moneda',
+        'cancelacion_cuotas_interes',
     ];
 
     // Mezclar defaults con lo enviado, tomando solo campos válidos
@@ -60,23 +62,25 @@ export const upsertConfiguracionService = async (empresa_id, data) => {
 
     const rows = await executeQuery(
         `INSERT INTO configuracion_empresa
-            (empresa_id, mora_activa, mora_tipo, mora_valor, mora_dias_gracia, mora_tope, incumplido_dias, moneda, simbolo_moneda)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            (empresa_id, mora_activa, mora_tipo, mora_valor, mora_dias_gracia, mora_tope, incumplido_dias, moneda, simbolo_moneda, cancelacion_cuotas_interes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (empresa_id) DO UPDATE SET
-            mora_activa      = EXCLUDED.mora_activa,
-            mora_tipo        = EXCLUDED.mora_tipo,
-            mora_valor       = EXCLUDED.mora_valor,
-            mora_dias_gracia = EXCLUDED.mora_dias_gracia,
-            mora_tope        = EXCLUDED.mora_tope,
-            incumplido_dias  = EXCLUDED.incumplido_dias,
-            moneda           = EXCLUDED.moneda,
-            simbolo_moneda   = EXCLUDED.simbolo_moneda,
-            updated_at       = CURRENT_TIMESTAMP
+            mora_activa                 = EXCLUDED.mora_activa,
+            mora_tipo                   = EXCLUDED.mora_tipo,
+            mora_valor                  = EXCLUDED.mora_valor,
+            mora_dias_gracia            = EXCLUDED.mora_dias_gracia,
+            mora_tope                   = EXCLUDED.mora_tope,
+            incumplido_dias             = EXCLUDED.incumplido_dias,
+            moneda                      = EXCLUDED.moneda,
+            simbolo_moneda              = EXCLUDED.simbolo_moneda,
+            cancelacion_cuotas_interes  = EXCLUDED.cancelacion_cuotas_interes,
+            updated_at                  = CURRENT_TIMESTAMP
          RETURNING *`,
         [
             empresa_id,
             valores.mora_activa, valores.mora_tipo, valores.mora_valor, valores.mora_dias_gracia,
             valores.mora_tope, valores.incumplido_dias, valores.moneda, valores.simbolo_moneda,
+            valores.cancelacion_cuotas_interes,
         ]
     );
     return rows[0];

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validarJWT } from "../middlewares/validar-jwt.js";
 import { validarCampos } from "../middlewares/validar-campos.js";
 import { check } from "express-validator";
-import { crearPrestamo, completarPrestamo, deleteFile, getPrestamos, getPrestamosByClientId, getPrestamosById, getPrestamosByUserId, getUploadFile, refinanciarPrestamo, updatePrestamo, uploadFile } from "../controllers/prestamosController.js";
+import { crearPrestamo, completarPrestamo, deleteFile, getPrestamos, getPrestamosByClientId, getPrestamosById, getPrestamosByUserId, getUploadFile, refinanciarPrestamo, updatePrestamo, uploadFile, getFiniquito, cancelarPrestamoAnticipado } from "../controllers/prestamosController.js";
 import { validarRol } from "../middlewares/validar-rol.js";
 import { userRol } from "../constants/usuarios.constants.js";
 const { superAdmin, admin, cobrador } = userRol;
@@ -37,6 +37,14 @@ route.post('/:id/refinanciar', [
     validarCampos,
     validarRol(superAdmin, admin)
 ], refinanciarPrestamo);
+
+route.get('/:id/finiquito', [
+    validarRol(superAdmin, admin)
+], getFiniquito);
+
+route.post('/:id/cancelar', [
+    validarRol(superAdmin, admin)
+], cancelarPrestamoAnticipado);
 
 route.post('/:id/archivos', [
     validarRol(superAdmin, admin)

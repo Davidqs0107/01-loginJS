@@ -7,6 +7,7 @@ import { executeTransaction } from "../helpers/transactionSql.js";
 import { registrarAuditoria } from "./auditoriaService.js";
 import { getConfiguracionService } from "./configuracionService.js";
 import { calcularMora } from "../helpers/mora.js";
+import { calcularFiniquito } from "../helpers/finiquito.js";
 import { diasDeAtraso } from "../helpers/pagoWaterfall.js";
 import fs from 'fs/promises';
 import moment from "moment";
@@ -313,6 +314,153 @@ export const refinanciarPrestamoService = async (data) => {
             nuevo_capital: nuevoCapital,
             prestamo: nuevo.prestamo,
             cuotas: nuevo.cuotas,
+        };
+    });
+};
+
+const round2 = (n) => Math.round(n * 100) / 100;
+const MSG_CANCELACION_SOLO_FIJO = "La cancelación anticipada solo aplica a préstamos de interés fijo.";
+
+/** Cantidad de cuotas de interés a cobrar en una cancelación anticipada (config por empresa, default 1). */
+const getCuotasInteresACobrar = async (empresa_id) => {
+    try {
+        const config = await getConfiguracionService(empresa_id);
+        return parseInt(config?.cancelacion_cuotas_interes ?? 1, 10) || 1;
+    } catch (_) {
+        return 1;
+    }
+};
+
+/**
+ * Preview de la cancelación anticipada (sin tocar la BD): capital pendiente,
+ * interés a cobrar/condonar y desglose por cuota. Para el modal de confirmación.
+ */
+export const getFiniquitoService = async ({ prestamo_id, empresa_id }) => {
+    const prestamoRows = await executeSelectOne(
+        `SELECT * FROM prestamos WHERE id = $1 AND empresa_id = $2`,
+        [prestamo_id, empresa_id]
+    );
+    if (prestamoRows.length === 0) throw new Error(notFoundError.prestamoNotFound);
+    const prestamo = prestamoRows[0];
+
+    if (prestamo.tipo_prestamo !== tipoPrestamoInteresEnum.fijo) {
+        throw new Error(MSG_CANCELACION_SOLO_FIJO);
+    }
+
+    const { data: cuotas } = await executeSelect(
+        `SELECT numero_cuota, monto, monto_pagado, estado FROM cuotas WHERE prestamo_id = $1 ORDER BY numero_cuota ASC`,
+        [prestamo_id], 1, 10000
+    );
+
+    const cuotasInteresACobrar = await getCuotasInteresACobrar(empresa_id);
+    const finiquito = calcularFiniquito({ cuotas, montoPrestamo: prestamo.monto, cuotasInteresACobrar });
+
+    return { prestamo, cuotas_interes_a_cobrar: cuotasInteresACobrar, ...finiquito };
+};
+
+/**
+ * Cancela anticipadamente un préstamo de interés fijo: cobra el capital
+ * pendiente + interés de las próximas N cuotas no pagadas (config por
+ * empresa, ver `getCuotasInteresACobrar`), condona el resto del interés
+ * pendiente y marca el préstamo como completado. Todo en una transacción.
+ */
+export const cancelarPrestamoAnticipadoService = async (data) => {
+    const { prestamo_id, empresa_id, usuario_id, tipo_pago = 'efectivo', actor = {} } = data;
+
+    return await executeTransaction(async (client) => {
+        const prestamoRes = await client.query(
+            `SELECT * FROM prestamos WHERE id = $1 AND empresa_id = $2`,
+            [prestamo_id, empresa_id]
+        );
+        if (prestamoRes.rowCount === 0) throw new Error(notFoundError.prestamoNotFound);
+        const prestamo = prestamoRes.rows[0];
+
+        if (prestamo.tipo_prestamo !== tipoPrestamoInteresEnum.fijo) {
+            throw new Error(MSG_CANCELACION_SOLO_FIJO);
+        }
+        if (['completado', 'refinanciado'].includes(prestamo.estado_prestamo)) {
+            throw new Error(`No se puede cancelar anticipadamente un préstamo en estado '${prestamo.estado_prestamo}'.`);
+        }
+
+        const cuotasInteresACobrar = await getCuotasInteresACobrar(empresa_id);
+
+        const cuotasRes = await client.query(
+            `SELECT id, numero_cuota, monto, monto_pagado, estado FROM cuotas WHERE prestamo_id = $1 ORDER BY numero_cuota ASC`,
+            [prestamo_id]
+        );
+        const cuotas = cuotasRes.rows;
+
+        const finiquito = calcularFiniquito({ cuotas, montoPrestamo: prestamo.monto, cuotasInteresACobrar });
+        if (finiquito.total_finiquito <= 0) {
+            throw new Error("No hay saldo pendiente.");
+        }
+
+        const interesPendienteTotal = round2(finiquito.interes_a_cobrar + finiquito.interes_condonado);
+        const fechaHoy = moment.utc().format("YYYY-MM-DD");
+        const cuotasCondonadas = [];
+
+        for (const item of finiquito.detalle) {
+            const cuota = cuotas.find((c) => c.numero_cuota === item.numero_cuota);
+
+            if (item.cobrar > 0) {
+                await client.query(
+                    `INSERT INTO pagos (cuota_id, usuario_id, monto, monto_mora, tipo_pago, fecha_pago)
+                     VALUES ($1, $2, $3, 0, $4, $5)`,
+                    [cuota.id, usuario_id, item.cobrar, tipo_pago, fechaHoy]
+                );
+
+                const nuevoMontoPagado = round2(parseFloat(cuota.monto_pagado) + item.cobrar);
+                let nuevoEstado;
+                if (nuevoMontoPagado >= parseFloat(cuota.monto)) nuevoEstado = 'pagada';
+                else if (item.condonar > 0) nuevoEstado = 'condonada';
+                else nuevoEstado = 'parcial';
+
+                await client.query(
+                    `UPDATE cuotas SET monto_pagado = $1, estado = $2, updated_at = NOW() WHERE id = $3`,
+                    [nuevoMontoPagado, nuevoEstado, cuota.id]
+                );
+                if (nuevoEstado === 'condonada') cuotasCondonadas.push(item.numero_cuota);
+            } else if (item.condonar > 0) {
+                await client.query(
+                    `UPDATE cuotas SET estado = 'condonada', updated_at = NOW() WHERE id = $1`,
+                    [cuota.id]
+                );
+                cuotasCondonadas.push(item.numero_cuota);
+            }
+        }
+
+        await client.query(
+            `UPDATE prestamos SET estado_prestamo = 'completado', updated_at = NOW() WHERE id = $1`,
+            [prestamo_id]
+        );
+
+        await registrarAuditoria({
+            client,
+            empresa_id,
+            usuario_id,
+            accion: 'cancelacion_anticipada',
+            entidad: 'prestamo',
+            entidad_id: Number(prestamo_id),
+            datos_antes: {
+                estado_anterior: prestamo.estado_prestamo,
+                capital_pendiente: finiquito.capital_pendiente,
+                interes_pendiente_total: interesPendienteTotal,
+            },
+            datos_despues: {
+                total_cobrado: finiquito.total_finiquito,
+                interes_cobrado: finiquito.interes_a_cobrar,
+                interes_condonado: finiquito.interes_condonado,
+                cuotas_condonadas: cuotasCondonadas,
+                tipo_pago,
+            },
+            ip: actor.ip ?? null,
+        });
+
+        return {
+            prestamo_id: Number(prestamo_id),
+            ...finiquito,
+            cuotas_condonadas: cuotasCondonadas,
+            tipo_pago,
         };
     });
 };

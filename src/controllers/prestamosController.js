@@ -1,6 +1,6 @@
 import { response } from "express";
 import { notFoundError } from "../constants/notfound.constants.js";
-import { crearPrestamoService, completarPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, refinanciarPrestamoService, updatePrestamoService, uploadFileService } from "../services/prestamosServices.js";
+import { crearPrestamoService, completarPrestamoService, deleteFileService, getPrestamosByClientIdServices, getPrestamosByIdService, getPrestamosByUserIdServices, getPrestamosServices, getUploadFileService, refinanciarPrestamoService, updatePrestamoService, uploadFileService, getFiniquitoService, cancelarPrestamoAnticipadoService } from "../services/prestamosServices.js";
 import { estadoPrestamo } from "../constants/commons.constans.js";
 import { formatDateWithDateFns } from "../helpers/functions.js";
 
@@ -18,6 +18,37 @@ export const refinanciarPrestamo = async (req, res) => {
         return res.status(201).json({ ok: true, msg: 'Préstamo refinanciado', ...result });
     } catch ({ message }) {
         console.error('Error en refinanciarPrestamo:', message);
+        const status = message === notFoundError.prestamoNotFound ? 404 : 400;
+        return res.status(status).json({ ok: false, msg: message });
+    }
+}
+
+export const getFiniquito = async (req, res) => {
+    const { id } = req.params;
+    const empresa_id = req.empresa_id;
+    try {
+        const result = await getFiniquitoService({ prestamo_id: id, empresa_id });
+        return res.status(200).json({ ok: true, ...result });
+    } catch ({ message }) {
+        console.error('Error en getFiniquito:', message);
+        const status = message === notFoundError.prestamoNotFound ? 404 : 400;
+        return res.status(status).json({ ok: false, msg: message });
+    }
+}
+
+export const cancelarPrestamoAnticipado = async (req, res) => {
+    const { id } = req.params;
+    const empresa_id = req.empresa_id;
+    const usuario_id = req.id;
+    const { tipo_pago = 'efectivo' } = req.body;
+    try {
+        const result = await cancelarPrestamoAnticipadoService({
+            prestamo_id: id, empresa_id, usuario_id, tipo_pago,
+            actor: { ip: req.ip },
+        });
+        return res.status(200).json({ ok: true, msg: 'Préstamo cancelado anticipadamente', ...result });
+    } catch ({ message }) {
+        console.error('Error en cancelarPrestamoAnticipado:', message);
         const status = message === notFoundError.prestamoNotFound ? 404 : 400;
         return res.status(status).json({ ok: false, msg: message });
     }
